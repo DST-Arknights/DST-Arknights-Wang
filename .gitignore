@@ -1,0 +1,19 @@
+# 发布产物
+/dist
+/out
+
+# 本地临时文件
+/temp/
+/.VSCodeCounter
+/.vscode
+
+# 音频源文件（导出产物不提交）
+/soundSource/**/*.fev
+/soundSource/**/*.fsb
+/soundSource/**/*.fdp.bak
+/soundSource/**/*.fdp.autosave
+.fsbcache/
+
+# 动画源文件（导出产物不提交）
+/animSource/**/*.zip
+/exported/**/*.zip

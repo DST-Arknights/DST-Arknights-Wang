@@ -1,0 +1,146 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT Version: 2.0"
+
+#. STRINGS.CHARACTER_TITLES.wang
+msgctxt "STRINGS.CHARACTER_TITLES.wang"
+msgid "Arknights Wang"
+msgstr "Arknights Wang"
+
+#. STRINGS.CHARACTER_SURVIVABILITY.wang
+msgctxt "STRINGS.CHARACTER_SURVIVABILITY.wang"
+msgid "Easy"
+msgstr "Easy"
+
+#. STRINGS.CHARACTER_NAMES.wang
+msgctxt "STRINGS.CHARACTER_NAMES.wang"
+msgid "Wang"
+msgstr "Wang"
+
+#. STRINGS.NAMES.WANG
+msgctxt "STRINGS.NAMES.WANG"
+msgid "Wang"
+msgstr "Wang"
+
+#. STRINGS.CHARACTERS.WANG.DESCRIBE.WANG_CHESS_BOX
+msgctxt "STRINGS.CHARACTERS.WANG.DESCRIBE.WANG_CHESS_BOX"
+msgid "You should know this is a chess box, right..."
+msgstr "You should know this is a chess box, right..."
+
+#. STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE
+msgctxt "STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE"
+msgid "I'll teach you a recipe."
+msgstr "I'll teach you a recipe."
+
+#. STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE_INTERRUPTED
+msgctxt "STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE_INTERRUPTED"
+msgid "Don't interrupt... let me finish."
+msgstr "Don't interrupt... let me finish."
+
+#. STRINGS.CHARACTERS.GENERIC.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE
+msgctxt "STRINGS.CHARACTERS.GENERIC.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE"
+msgid "I have nothing to teach."
+msgstr "I have nothing to teach."
+
+#. STRINGS.CHARACTERS.WANG.ANNOUNCE.TEACH_RECIPE
+msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.TEACH_RECIPE"
+msgid "Do it thus... and so..."
+msgstr "Do it thus... and so..."
+
+#. STRINGS.CHARACTERS.WANG.ANNOUNCE.TEACH_RECIPE_INTERRUPTED
+msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.TEACH_RECIPE_INTERRUPTED"
+msgid "Just a moment... No quitting halfway... What are you doing?"
+msgstr "Just a moment... No quitting halfway... What are you doing?"
+
+#. STRINGS.UI.ARK_SKILL.NAMES.WANG.1
+msgctxt "STRINGS.UI.ARK_SKILL.NAMES.WANG.1"
+msgid "Seize Advantage"
+msgstr "Seize Advantage"
+
+#. STRINGS.UI.ARK_SKILL.NAMES.WANG.2
+msgctxt "STRINGS.UI.ARK_SKILL.NAMES.WANG.2"
+msgid "Linked Stars"
+msgstr "Linked Stars"
+
+#. STRINGS.UI.ARK_SKILL.NAMES.WANG.3
+msgctxt "STRINGS.UI.ARK_SKILL.NAMES.WANG.3"
+msgid "World Endgame"
+msgstr "World Endgame"
+
+#. STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.1
+msgctxt "STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.1"
+msgid "Auto unlock"
+msgstr "Auto unlock"
+
+#. STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.2
+msgctxt "STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.2"
+msgid "Unlocked at Elite I"
+msgstr "Unlocked at Elite I\nReach max level and elite up at the Training Room"
+
+#. STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.3
+msgctxt "STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.3"
+msgid "Unlocked at Elite II"
+msgstr "Unlocked at Elite II\nReach max level and elite up at the Training Room"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1"
+msgid "Costs 5 SP\nCan store 5 charges"
+msgstr "Costs 5 SP\nCan store 5 charges"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.2
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.2"
+msgid "Costs 3 SP\nCan store 7 charges"
+msgstr "Costs 3 SP\nCan store 7 charges"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.3
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.3"
+msgid "Costs 1 SP\nCan store 10 charges"
+msgstr "Costs 1 SP\nCan store 10 charges"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2.1
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2.1"
+msgid "Costs 10 SP\nCan store 4 charges"
+msgstr "Costs 10 SP\nCan store 4 charges"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2.2
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2.2"
+msgid "Costs 5 SP\nCan store 6 charges"
+msgstr "Costs 5 SP\nCan store 6 charges"
+
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3.1
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3.1"
+msgid "Costs 181 SP\nWhile active, drains 1 SP per second"
+msgstr "Costs 181 SP\nWhile active, drains 1 SP per second"
+
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
+msgid "A pawn advances daily; no effort is ever wasted."
+msgstr "A pawn advances daily; no effort is ever wasted."
+
+#. STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED
+msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED"
+msgid "Learned %s"
+msgstr "Learned %s"
+
+#. STRINGS.CHARACTER_DESCRIPTIONS.wang
+msgctxt "STRINGS.CHARACTER_DESCRIPTIONS.wang"
+msgid "A quiet chess player, trading his life for the board"
+msgstr "*A quiet chess player, trading his life for the board\n*Max health decreases as he grows, empowering his black stones\n*Cannot carry heavy objects alone, but can while riding a beefalo\n*Reads books well and masters recipes one by one"
+
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING"
+msgid "Too heavy to carry alone... I'll need a beefalo."
+msgstr "Too heavy to carry alone... I'll need a beefalo."
+
+#. STRINGS.ACTIONS.TEACH_RECIPE
+msgctxt "STRINGS.ACTIONS.TEACH_RECIPE"
+msgid "Teach Recipe"
+msgstr "Teach Recipe"
+
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE"
+msgid "All that I know, you already know... I have no new moves to teach."
+msgstr "All that I know, you already know... I have no new moves to teach."

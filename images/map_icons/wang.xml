@@ -2,6 +2,6 @@
 <Atlas>
 	<Texture filename="wang.tex" />
 	<Elements>
-		<Element name="wang.tex" u1="0.001" u2="0.999" v2="0.999" v1="0.001" variant="" />
+		<Element name="wang.tex" u1="0.001" u2="0.7255625" v2="0.999" v1="0.2588125" variant="" />
 	</Elements>
 </Atlas>

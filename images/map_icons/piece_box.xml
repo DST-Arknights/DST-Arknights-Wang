@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Atlas>
+	<Texture filename="piece_box.tex" />
+	<Elements>
+		<Element name="piece_box.tex" u1="0.001" u2="0.5224375" v2="0.999" v1="0.110375" variant="" />
+	</Elements>
+</Atlas>

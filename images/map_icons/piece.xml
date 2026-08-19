@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Atlas>
+	<Texture filename="piece.tex" />
+	<Elements>
+		<Element name="piece.tex" u1="0.001" u2="0.889625" v2="0.999" v1="0.110375" variant="" />
+	</Elements>
+</Atlas>

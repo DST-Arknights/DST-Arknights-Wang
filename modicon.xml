@@ -2,6 +2,6 @@
 <Atlas>
 	<Texture filename="modicon.tex" />
 	<Elements>
-		<Element name="modicon.tex" u1="0.001" u2="0.9911875" v2="0.999" v1="0.0088125" variant="" />
+		<Element name="modicon.tex" u1="0.001" u2="0.5224375" v2="0.999" v1="0.4775625" variant="" />
 	</Elements>
 </Atlas>

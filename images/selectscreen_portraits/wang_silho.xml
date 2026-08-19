@@ -1,1 +1,7 @@
-<Atlas><Texture filename="wang_silho.tex" /><Elements><Element name="wang_silho.tex" u1="0.001953125" u2="0.732421875" v1="0.4462890625" v2="0.9990234375" /></Elements></Atlas>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Atlas>
+	<Texture filename="wang_silho.tex" />
+	<Elements>
+		<Element name="wang_silho.tex" u1="0.001" u2="0.72165625" v2="0.999" v1="0.1806875" variant="" />
+	</Elements>
+</Atlas>

@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Atlas>
+	<Texture filename="names_wang.tex" />
+	<Elements>
+		<Element name="wang.tex" u1="0.001" u2="0.85446875" v2="0.999" v1="0.15334375" variant="" />
+	</Elements>
+</Atlas>

@@ -3,6 +3,10 @@
 -- 职责：制作完成监听 → 有几率掌握 → MasterRecipe（解锁 + 标记 + 事件）
 -- 望专属逻辑（升级自动掌握 / 掌握经验）在 wang.lua
 
+local function on_enable_teaching(self, enabled)
+  self.inst.replica.recipe_mastery:SetTeachingEnabled(enabled)
+end
+
 local function SendMasterRecipeNotify(self, name)
   local inst = self.inst
   if inst.userid then
@@ -45,19 +49,21 @@ local RecipeMastery = Class(function(self, inst)
   self.inst = inst
   self.states = {}                 -- [配方名] = RECIPE_MASTERY_STATE 数字，与副本一致
   self.sanity_buff_enabled = false -- 精神增益开启状态不存档，由用户组件手动启用
-  -- 掌握与系统解锁绑定：任何 unlockrecipe → 直接标记已掌握 + 推掌握事件
+  self.enable_teaching = false          -- 可传授开关
   -- （不传 source，默认以 inst 为 source，实体移除时自动清理）
   inst:ListenForEvent("learnrecipe", OnLearnRecipe)
-end)
+end, nil, {
+  enable_teaching = on_enable_teaching,
+})
 
 -- 可传授开关（教学者身份；同步到副本网络变量，客户端采集器可读）
 function RecipeMastery:EnableTeaching(enabled)
-  self.inst.replica.recipe_mastery:SetTeachingEnabled(enabled)
+  self.enable_teaching = enabled
 end
 
 -- 精英阶级
 function RecipeMastery:GetElite()
-  return self.inst.components.ark_elite.elite
+  return self.inst.components.ark_elite and self.inst.components.ark_elite.elite or 1
 end
 
 -- 配方难度档（1~7：普通一/魔法一/普通二/魔法二/远古/暗影月亮/其他）

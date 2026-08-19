@@ -25,7 +25,7 @@ local Elite1Ingredients = {
 local Elite2Ingredients = {
   Ingredient("ark_gold", 180000), -- 18W 龙门币
   Ingredient("papyrus", 8),       -- 8 莎草纸
-  Ingredient("leafyloaf", 4),     -- 4 叶肉糕
+  Ingredient("leafloaf", 4),     -- 4 叶肉糕
   Ingredient("slurper_pelt", 6),  -- 6 蛞蝓龟黏液
 }
 

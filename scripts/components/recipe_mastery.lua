@@ -3,22 +3,29 @@
 -- 职责：制作完成监听 → 有几率掌握 → MasterRecipe（解锁 + 标记 + 事件）
 -- 望专属逻辑（升级自动掌握 / 掌握经验）在 wang.lua
 
-local RecipeMastery = Class(function(self, inst)
-  self.inst = inst
-  self.states = {} -- [配方名] = RECIPE_MASTERY_STATE 数字，与副本一致
-  self.sanity_buff_enabled = false -- 精神增益开启状态不存档，由用户组件手动启用
-  -- 掌握与系统解锁绑定：任何 unlockrecipe → 直接标记已掌握 + 推掌握事件
-  -- （不传 source，默认以 inst 为 source，实体移除时自动清理）
-  inst:ListenForEvent("unlockrecipe", self._on_unlockrecipe)
-end)
-
--- 可传授开关（教学者身份；同步到副本网络变量，客户端采集器可读）
-function RecipeMastery:EnableTeaching(enabled)
-  self.inst.replica.recipe_mastery:SetTeachingEnabled(enabled)
+local function SendMasterRecipeNotify(self, name)
+  local inst = self.inst
+  if inst.userid then
+    SendRPCToClient(CLIENT_RPC.LearnBuilderRecipe, inst.userid, name)
+  end
+  if inst.player_classified then
+    inst.player_classified.learnrecipeevent:push()
+  end
 end
 
--- unlockrecipe 事件：解锁即掌握（驱动经验/精神增益等）
-function RecipeMastery:_on_unlockrecipe(inst, data)
+-- 学习接口：掌握 = 触发系统解锁（unlockrecipe 事件推动掌握状态 + 掌握事件）
+local function MasterRecipe(self, name)
+  if not self:IsMastered(name) then
+    local inst = self.inst
+    if inst.components.builder then
+      inst.components.builder:UnlockRecipe(name)
+    end
+    self:SetState(name, RECIPE_MASTERY_STATE.MASTERED)
+    inst:PushEvent("recipe_mastered", { recipe = name })
+  end
+end
+
+local function OnLearnRecipe(inst, data)
   local name = data and data.recipe
   if name == nil then
     return
@@ -27,8 +34,25 @@ function RecipeMastery:_on_unlockrecipe(inst, data)
   if recipe == nil or not IsLearnableRecipe(recipe) then
     return
   end
-  self:SetState(name, RECIPE_MASTERY_STATE.MASTERED)
-  self.inst:PushEvent("recipe_mastered", { recipe = name })
+  local self = inst.components.recipe_mastery
+  if not self:IsMastered(name) then
+    MasterRecipe(self, name)
+  end
+end
+
+
+local RecipeMastery = Class(function(self, inst)
+  self.inst = inst
+  self.states = {}                 -- [配方名] = RECIPE_MASTERY_STATE 数字，与副本一致
+  self.sanity_buff_enabled = false -- 精神增益开启状态不存档，由用户组件手动启用
+  -- 掌握与系统解锁绑定：任何 unlockrecipe → 直接标记已掌握 + 推掌握事件
+  -- （不传 source，默认以 inst 为 source，实体移除时自动清理）
+  inst:ListenForEvent("learnrecipe", OnLearnRecipe)
+end)
+
+-- 可传授开关（教学者身份；同步到副本网络变量，客户端采集器可读）
+function RecipeMastery:EnableTeaching(enabled)
+  self.inst.replica.recipe_mastery:SetTeachingEnabled(enabled)
 end
 
 -- 精英阶级
@@ -103,14 +127,13 @@ local function OnBuildItem(inst, data)
   end
 end
 
--- 学习接口：掌握 = 触发系统解锁（unlockrecipe 事件推动掌握状态 + 掌握事件）
 function RecipeMastery:MasterRecipe(name)
   if not self:IsMastered(name) then
-    local inst = self.inst
-    if inst.components.builder then
-      inst.components.builder:UnlockRecipe(name)
+    local recipe = GetValidRecipe(name)
+    if recipe ~= nil and IsLearnableRecipe(recipe) then
+      MasterRecipe(self, name)
+      SendMasterRecipeNotify(self, name)
     end
-    self.inst:PushEvent("learnrecipe", { teacher = inst, recipe = name })
   end
 end
 
@@ -132,7 +155,7 @@ local function SanityRateFn(inst, dt)
     return 0
   end
   return comp._sanity_mastering * TUNING.WANG.SANITY_DRAIN_PER_UNMASTERED
-    + comp._sanity_mastered * TUNING.WANG.SANITY_RECOVERY_PER_MASTERED
+      + comp._sanity_mastered * TUNING.WANG.SANITY_RECOVERY_PER_MASTERED
 end
 
 -- 接口：启用精神增益（由用户组件手动启用；开启状态不存档）
@@ -176,6 +199,7 @@ end
 
 function RecipeMastery:OnRemoveFromEntity()
   self:DisableAutoMastery()
+  self.inst:RemoveEventCallback("learnrecipe", OnLearnRecipe)
 end
 
 return RecipeMastery

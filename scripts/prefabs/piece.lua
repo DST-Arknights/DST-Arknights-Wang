@@ -2,16 +2,22 @@ require "prefabutil"
 
 -- ════════════════════════════════════════════════════════
 -- 望的棋子（黑子）
--- 单 prefab 三形态（物品态 / 部署态）：
---   物品态(未装备) — 可入背包 / 右键地面栽种(DEPLOY)
---   装备态         — 右键投掷(TOSS，水球模式)，item 本身抛物线飞出
---   部署态         — 地面建筑(structure)，可被锤子 / boss 摧毁
--- 投掷落地：对附近生物造成 PIECE_THROW_DAMAGE 伤害，并转为部署态
+-- 物品态（可堆叠 / 可装备投掷）→ 投掷落地转部署态
+--   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS，水球模式)
+--   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁
+-- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
+--           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
 -- 动画来源: animSource/piece/piece.scml
---   ChuXian  — 出现（部署落地）
---   WeiJiHuo — 未激活（待机）
+--   idle     — 物品态（普通物品丢地上的表现）
+--   ChuXian  — 出现（已不再用于部署）
+--   WeiJiHuo — 未激活（部署态待机）
 --   JiHuo    — 激活
 -- ════════════════════════════════════════════════════════
+
+-- 物理效果数值（一般不改动，直接放预制体；可调整数值放 modmain）
+local THROW_SPEED = 15    -- 投掷水平速度
+local THROW_GRAVITY = -35 -- 投掷重力（抛物线）
+local THROW_AOE = 1       -- 落地伤害范围
 
 RegisterInventoryItemAtlas("images/inventoryimages/piece.xml", "piece.tex")
 
@@ -24,9 +30,9 @@ local assets = {
 local prefabs = {}
 
 -- ────────────────────────────────────────────────────────
--- 形态切换
+-- 部署态：投掷落地后转地面建筑
 -- ────────────────────────────────────────────────────────
-local function SetDeployedState(inst, playdeploy)
+local function SetDeployedState(inst)
   if inst._isdeployed then
     return
   end
@@ -37,77 +43,50 @@ local function SetDeployedState(inst, playdeploy)
   inst.Physics:Stop()
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
-  if playdeploy then
-    inst.AnimState:PlayAnimation("ChuXian")
-    inst.AnimState:PushAnimation("WeiJiHuo", true)
-  else
-    inst.AnimState:PlayAnimation("WeiJiHuo", true)
-  end
+  inst.AnimState:PlayAnimation("WeiJiHuo", true)
 end
 
 -- ────────────────────────────────────────────────────────
--- 栽种：未装备时右键地面（deployable.ondeploy）
--- ────────────────────────────────────────────────────────
-local function OnDeploy(inst, pt, deployer)
-  inst.Physics:Stop()
-  inst.Physics:Teleport(pt:Get())
-  SetDeployedState(inst, true)
-end
-
--- ────────────────────────────────────────────────────────
--- 投掷落地（complexprojectile onhit）：落点附近 5 伤害 + 转部署态
+-- 投掷落地（complexprojectile onhit）：
+-- 落点附近伤害 + 特效遮盖 + 转部署态（不播出现动画）
 -- ────────────────────────────────────────────────────────
 local function OnTossHit(inst, attacker)
   local x, y, z = inst.Transform:GetWorldPosition()
 
-  local ents = TheSim:FindEntities(x, y, z, TUNING.WANG.PIECE_THROW_AOE, nil, { "INLIMBO", "playerghost" })
+  local ents = TheSim:FindEntities(x, y, z, THROW_AOE, nil, { "INLIMBO", "playerghost" })
   for _, ent in ipairs(ents) do
     if ent ~= nil and ent:IsValid() and ent.components.combat ~= nil
-      and attacker ~= nil and attacker:IsValid() then
+        and attacker ~= nil and attacker:IsValid() then
       ent.components.combat:GetAttacked(attacker, TUNING.WANG.PIECE_THROW_DAMAGE)
     end
   end
 
-  SetDeployedState(inst, true)
-end
-
--- ────────────────────────────────────────────────────────
--- deployable 组件：未装备时存在（右键=栽种），装备时移除（右键=投掷）
--- 移除后 replica 的 deploy mode 置 NONE，客户端 DEPLOY 动作消失、
--- deployable tag 也移除，TOSS 动作随之出现（componentactions 检查 tag）
--- ────────────────────────────────────────────────────────
-local function ConfigureDeployable(inst)
-  inst:AddComponent("deployable")
-  inst.components.deployable.ondeploy = OnDeploy
-  inst.components.deployable:SetDeployMode(DEPLOYMODE.DEFAULT)
-  inst.components.deployable:SetDeploySpacing(DEPLOYSPACING.LESS)
-end
-
-local function RemoveDeployable(inst)
-  if inst.components.deployable ~= nil then
-    inst:RemoveComponent("deployable")
+  -- 特效遮盖黑子生成过程
+  local fx1 = SpawnPrefab("chester_transform_fx")
+  if fx1 ~= nil then
+    fx1.Transform:SetPosition(x, y, z)
   end
+  local fx2 = SpawnPrefab("wanda_attack_pocketwatch_old_fx")
+  if fx2 ~= nil then
+    fx2.Transform:SetPosition(x, y, z)
+  end
+
+  SetDeployedState(inst)
 end
 
 -- ────────────────────────────────────────────────────────
--- 装备手上显示（占位：用黑子主体 symbol，缺专门的 swap_piece）
+-- 装备手上显示
 -- ────────────────────────────────────────────────────────
 local function onequip(inst, owner)
   owner.AnimState:OverrideSymbol("swap_object", "swap_piece", "swap_object")
   owner.AnimState:Show("ARM_carry")
   owner.AnimState:Hide("ARM_normal")
-  -- 装备后禁用栽种，右键变成投掷（TOSS）
-  RemoveDeployable(inst)
 end
 
 local function onunequip(inst, owner)
   owner.AnimState:ClearOverrideSymbol("swap_object")
   owner.AnimState:Hide("ARM_carry")
   owner.AnimState:Show("ARM_normal")
-  -- 回到背包后恢复栽种（部署态黑子不可拾取，不会走到这里）
-  if not inst._isdeployed then
-    ConfigureDeployable(inst)
-  end
 end
 
 -- ────────────────────────────────────────────────────────
@@ -129,11 +108,11 @@ local function fn()
   inst.entity:AddNetwork()
 
   MakeInventoryPhysics(inst)
-  inst:SetDeploySmartRadius(DEPLOYSPACING_RADIUS[DEPLOYSPACING.LESS] / 2)
 
+  -- 物品态：普通物品的表现（背包/地上显示 idle）
   inst.AnimState:SetBank("piece")
   inst.AnimState:SetBuild("piece")
-  inst.AnimState:PlayAnimation("WeiJiHuo", true)
+  inst.AnimState:PlayAnimation("idle", true)
 
   MakeInventoryFloatable(inst)
 
@@ -159,20 +138,22 @@ local function fn()
 
   inst:AddComponent("inventoryitem")
 
-  -- 初始为物品态：右键地面栽种
-  ConfigureDeployable(inst)
+  -- 可堆叠（系统最大堆叠数）
+  inst:AddComponent("stackable")
+  inst.components.stackable.maxsize = TUNING.STACK_SIZE_PELLET
 
-  -- 装备手上
+  -- 装备手上（equipstack：从堆叠分出单个装备，投掷即消耗一个）
   inst:AddComponent("equippable")
   inst.components.equippable.equipslot = EQUIPSLOTS.HANDS
+  inst.components.equippable.equipstack = true
   inst.components.equippable:SetOnEquip(onequip)
   inst.components.equippable:SetOnUnequip(onunequip)
 
   -- 投掷：item 本身作为抛物线投掷物（waterballoon 模式）
-  -- 投掷 = 消耗：TOSS 把 item 从手上丢出，落地转部署态，不再回到背包
+  -- 投掷 = 消耗：TOSS 把装备的单个黑子丢出，落地转部署态，堆叠中其余保留
   inst:AddComponent("complexprojectile")
-  inst.components.complexprojectile:SetHorizontalSpeed(TUNING.WANG.PIECE_THROW_SPEED)
-  inst.components.complexprojectile:SetGravity(TUNING.WANG.PIECE_THROW_GRAVITY)
+  inst.components.complexprojectile:SetHorizontalSpeed(THROW_SPEED)
+  inst.components.complexprojectile:SetGravity(THROW_GRAVITY)
   inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
   inst.components.complexprojectile:SetOnHit(OnTossHit)
 
@@ -183,8 +164,19 @@ local function fn()
   inst.components.workable:SetOnFinishCallback(OnHammered)
   inst.components.workable:SetWorkable(false)
 
+  -- 部署状态存档：读档后恢复为地面建筑
+  inst.OnSave = function(inst, data)
+    if inst._isdeployed then
+      data.isdeployed = true
+    end
+  end
+  inst.OnLoad = function(inst, data)
+    if data ~= nil and data.isdeployed then
+      SetDeployedState(inst)
+    end
+  end
+
   return inst
 end
 
-return Prefab("piece", fn, assets, prefabs),
-  MakePlacer("piece_placer", "piece", "piece", "WeiJiHuo")
+return Prefab("piece", fn, assets, prefabs)

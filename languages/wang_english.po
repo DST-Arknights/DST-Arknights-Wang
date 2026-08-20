@@ -25,6 +25,11 @@ msgctxt "STRINGS.NAMES.WANG"
 msgid "Wang"
 msgstr "Wang"
 
+#. STRINGS.SKIN_NAMES.wang_none
+msgctxt "STRINGS.SKIN_NAMES.wang_none"
+msgid "Wang"
+msgstr "Wang"
+
 #. STRINGS.CHARACTERS.WANG.DESCRIBE.WANG_CHESS_BOX
 msgctxt "STRINGS.CHARACTERS.WANG.DESCRIBE.WANG_CHESS_BOX"
 msgid "You should know this is a chess box, right..."
@@ -159,3 +164,23 @@ msgstr "A black stone placed by Wang."
 msgctxt "STRINGS.CHARACTERS.WANG.DESCRIBE.PIECE"
 msgid "My stone."
 msgstr "My stone."
+
+#. STRINGS.UI.ARK_TALENT.NAMES.WANG.1
+msgctxt "STRINGS.UI.ARK_TALENT.NAMES.WANG.1"
+msgid "Cast Stone"
+msgstr "Cast Stone"
+
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.1
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.1"
+msgid "Generate a Black Stone in your inventory every 20 seconds."
+msgstr "Generate a Black Stone in your inventory every 20 seconds."
+
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.2
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.2"
+msgid "Generate a Black Stone in your inventory every 15 seconds."
+msgstr "Generate a Black Stone in your inventory every 15 seconds."
+
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3"
+msgid "Generate a Black Stone in your inventory every 10 seconds."
+msgstr "Generate a Black Stone in your inventory every 10 seconds."

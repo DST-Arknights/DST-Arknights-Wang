@@ -46,11 +46,8 @@ TUNING.WANG.WORK_EFFICIENCY = 0.8      -- 工作效率
 TUNING.WANG.HUNGER_DRAIN_RATE = 0.8    -- 饥饿下降速率（较慢）
 TUNING.WANG.EAT_EFFECT_MULTIPLIER = 0.5 -- 进食饥饿恢复（0.5倍）
 
--- 黑子投掷（装备后右键，水球模式抛物线）
+-- 黑子投掷（可调整数值；物理数值在 piece.lua 内）
 TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
-TUNING.WANG.PIECE_THROW_AOE = 1       -- 落地伤害范围
-TUNING.WANG.PIECE_THROW_SPEED = 15    -- 水平速度
-TUNING.WANG.PIECE_THROW_GRAVITY = -35 -- 重力（抛物线）
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方
@@ -104,6 +101,7 @@ end
 -- ════════════════════════════════════════════════════════
 modimport("modmain/wang_elite")
 modimport("modmain/wang_skill")
+modimport("modmain/wang_talent")
 
 -- ════════════════════════════════════════════════════════
 -- recipe_mastery 组件注册（可复制，全玩家挂载；传授目标也需组件）

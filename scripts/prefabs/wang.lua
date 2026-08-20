@@ -32,6 +32,10 @@ end
 
 local function OnNewSpawn(inst)
   InstallDefaultSkills(inst)
+  -- 天赋：铸子（被动，出生即有）
+  if inst.components.ark_talent:GetTalent("wang_talent_zhuzi") == nil then
+    inst.components.ark_talent:AddTalent("wang_talent_zhuzi")
+  end
 end
 
 -- ════════════════════════════════════════════════════════
@@ -240,6 +244,16 @@ local function master_post_init(inst)
   })
   -- 出生时安装技能（DeclareBuiltin 只注册配置，AddSkill 才真正安装）
   inst.OnNewSpawn = OnNewSpawn
+
+  -- 天赋：铸子（出生解锁，等级随精英化 20/15/10 秒生成黑子）
+  -- 组件可能已被物品包 AddPlayerPostInit 挂载，避免重复添加
+  if inst.components.ark_talent == nil then
+    inst:AddComponent("ark_talent")
+  end
+  inst.components.ark_talent:DeclareBuiltin("wang_talent_zhuzi", {
+    requiredElite = 1,                       -- 精英0 解锁（出生即有）
+    eliteLevelMap = { [1] = 1, [2] = 2, [3] = 3 }, -- 精英0→1级，精英1→2级，精英2→3级
+  })
 
   -- 配方掌握（望安装并启用：自动掌握 / 精神增益 / 可传授）
   inst:AddComponent("recipe_mastery")

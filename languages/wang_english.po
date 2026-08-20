@@ -144,3 +144,18 @@ msgstr "Teach Recipe"
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE"
 msgid "All that I know, you already know... I have no new moves to teach."
 msgstr "All that I know, you already know... I have no new moves to teach."
+
+#. STRINGS.NAMES.PIECE
+msgctxt "STRINGS.NAMES.PIECE"
+msgid "Black Stone"
+msgstr "Black Stone"
+
+#. STRINGS.CHARACTERS.GENERIC.DESCRIBE.PIECE
+msgctxt "STRINGS.CHARACTERS.GENERIC.DESCRIBE.PIECE"
+msgid "A black stone placed by Wang."
+msgstr "A black stone placed by Wang."
+
+#. STRINGS.CHARACTERS.WANG.DESCRIBE.PIECE
+msgctxt "STRINGS.CHARACTERS.WANG.DESCRIBE.PIECE"
+msgid "My stone."
+msgstr "My stone."

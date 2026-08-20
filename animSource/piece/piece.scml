@@ -14,7 +14,7 @@
     </folder>
     <folder id="1" name="HeiZi">
         <file id="0" name="HeiZi/HeiZi-0.png" width="198" height="202" pivot_x="0.5" pivot_y="0.5"/>
-        <file id="1" name="HeiZi/HeiZi-1.png" width="198" height="202" pivot_x="0.5" pivot_y="0.5"/>
+        <file id="1" name="HeiZi/HeiZi-1.png" width="198" height="202" pivot_x="0.525" pivot_y="0.122549"/>
     </folder>
     <folder id="2" name="YinYing">
         <file id="0" name="YinYing/YinYing-0.png" width="198" height="202" pivot_x="0.5" pivot_y="0.5"/>
@@ -802,7 +802,7 @@
                     <object folder="1" file="0" y="373.006369" angle="0"/>
                 </key>
                 <key id="3" time="500" spin="0">
-                    <object folder="1" file="1" y="72.766465" angle="0"/>
+                    <object folder="1" file="1" x="103.95" y="-104.478637" angle="0"/>
                 </key>
             </timeline>
             <timeline id="1" name="YinYing-0">
@@ -1074,6 +1074,18 @@
                 </key>
                 <key id="3" time="1400" spin="0">
                     <object folder="3" file="0" y="-33.934426" angle="90" scale_x="1.4" a="0.5"/>
+                </key>
+            </timeline>
+        </animation>
+        <animation id="7" name="idle" length="1000">
+            <mainline>
+                <key id="0">
+                    <object_ref id="0" name="HeiZi-1" folder="1" file="1" abs_x="-8.383333" abs_y="0.421565" abs_pivot_x="0.525" abs_pivot_y="0.122549" abs_angle="360" abs_scale_x="1" abs_scale_y="1" abs_a="1" timeline="0" key="0" z_index="0"/>
+                </key>
+            </mainline>
+            <timeline id="0" name="HeiZi-1">
+                <key id="0" spin="0">
+                    <object folder="1" file="1" x="-8.383333" y="0.421565"/>
                 </key>
             </timeline>
         </animation>

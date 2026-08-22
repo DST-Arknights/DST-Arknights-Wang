@@ -5,11 +5,83 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 -- 武器：拈子剑（另行实现）
 local ARK_CONSTANTS = require("ark_constants")
 
+-- 取势（技能1）
+local WANG_SKILL1_AOE_RANGE = 4     -- 引爆范围（选择点周围）
+local WANG_SKILL1_CAST_RANGE = 20   -- 施法距离（玩家可远程施法，无需走到跟前）
+
+-- 取势范围选择器（老方案）：范围内必须有已部署黑子才显示合法（validfn）
+RegisterTargetSelector("wang_piece_aoe", AreaTargetSelector {
+  range          = WANG_SKILL1_CAST_RANGE, -- 施法距离（aoetargeting.range → CASTAOE distance）
+  deployradius   = 0,
+  reticuleprefab = "reticuleaoe",
+  pingprefab     = "reticuleaoeping",
+  validfn = function(selectorInst, reticule, pos)
+    local x, y, z = pos:Get()
+    return #TheSim:FindEntities(x, y, z, WANG_SKILL1_AOE_RANGE, { "wang_piece_deployed" }, nil) > 0
+  end,
+})
+
+-- 技能1描述：三级共用模板（LEVEL_DESC.WANG[1][1] 带 %s 倍率占位）
+local function WangSkill1LevelDesc(skill)
+  local params = skill:GetLevelParams()
+  return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1][1], params.damageMultiplier)
+end
+
+-- 技能1激活测试（取势）：确认选择后（框架传入 targetPos）检查引爆范围内是否有已部署黑子，
+-- 通过则缓存 targets（非 data，不参与存档）；无引爆目标返回 false → 不消耗技能充能
+local function OnWangSkill1ActivateTest(skill, params)
+  local x, y, z = params.targetPos:Get()
+  local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL1_AOE_RANGE, { "wang_piece_deployed" }, nil)
+  if #pieces == 0 then
+    return false, 'SKILL_CANNOT_ACTIVATE'
+  end
+  -- 缓存引爆目标到 skill 对象（不存 state，state 会处理存档，此缓存无需存档）
+  skill._wang_skill1_targets = pieces
+  return true
+end
+
+-- 技能1激活（取势）：主动引爆 test 缓存的 targets；data.targetPos 由框架传入
+local function OnWangSkill1Activate(skill, data)
+  local inst = skill.inst
+  if data == nil or data.targetPos == nil then
+    return false, 'SKILL_CANNOT_ACTIVATE'
+  end
+  local pos = data.targetPos
+
+  local pieces = skill._wang_skill1_targets
+  skill._wang_skill1_targets = nil
+  -- 兜底：若 test 未缓存（异常路径），按 data.targetPos 重新检索
+  if pieces == nil then
+    local x, y, z = pos:Get()
+    pieces = TheSim:FindEntities(x, y, z, WANG_SKILL1_AOE_RANGE, { "wang_piece_deployed" }, nil)
+  end
+  if #pieces == 0 then
+    return false, 'SKILL_CANNOT_ACTIVATE'
+  end
+
+  -- 每个黑子主动引爆：伤害 = 基础伤害 × 技能倍率（伤害来源为施法者，记击杀）
+  local levelParams = skill:GetLevelParams()
+  local damage = TUNING.WANG.PIECE_BASE_DAMAGE * levelParams.damageMultiplier
+  for _, piece in ipairs(pieces) do
+    if piece:IsValid() and piece.ActiveExplode ~= nil then
+      piece:ActiveExplode(inst, damage)
+    end
+  end
+
+  local x, y, z = pos:Get()
+  ArkLogger:Debug(string.format("取势：选择点(%.1f,%.1f,%.1f) 主动引爆 %d 枚黑子，单发伤害 %.1f",
+    x, y, z, #pieces, damage))
+
+  return true
+end
+
 local skillConfig = {
   {
     id = 'wang_skill1', -- 取势
     name = STRINGS.UI.ARK_SKILL.NAMES.WANG[1],
     lockedDesc = STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG[1],
+    -- 三级共用同一描述函数（level desc 为空时 skill_desc 回退到 config 层）
+    desc = WangSkill1LevelDesc,
     atlas = "images/wang_skill.xml",
     image = "skill_icon_wang_1.tex",
     recipe_atlas = "images/wang_skill.xml",
@@ -18,21 +90,22 @@ local skillConfig = {
     hotkey = KEY_Z,
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO, -- 自动回复
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,        -- 手动触发
+    ActivateTest = OnWangSkill1ActivateTest,
+    OnActivate = OnWangSkill1Activate,
+    -- 预声明选择器（RegisterTargetSelector 声明于本文件顶部）
+    targetSelector = "wang_piece_aoe",
     levels = { {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1][1],
       activationEnergy = 5,       -- 消耗 SP（设定：5→3→1）
       maxActivationStacks = 5,    -- 可储存次数（设定：5→7→10）
-      params = {},
+      params = { damageMultiplier = 0.9 },
     }, {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1][2],
       activationEnergy = 3,
       maxActivationStacks = 7,
-      params = {},
+      params = { damageMultiplier = 1.1 },
     }, {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1][3],
       activationEnergy = 1,
       maxActivationStacks = 10,
-      params = {},
+      params = { damageMultiplier = 1.3 },
     } },
   },
   {

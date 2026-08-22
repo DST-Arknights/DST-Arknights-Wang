@@ -46,8 +46,10 @@ TUNING.WANG.WORK_EFFICIENCY = 0.8      -- 工作效率
 TUNING.WANG.HUNGER_DRAIN_RATE = 0.8    -- 饥饿下降速率（较慢）
 TUNING.WANG.EAT_EFFECT_MULTIPLIER = 0.5 -- 进食饥饿恢复（0.5倍）
 
--- 黑子投掷（可调整数值；物理数值在 piece.lua 内）
+-- 黑子（可调整数值；物理数值在 piece.lua 内）
 TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
+TUNING.WANG.PIECE_BASE_DAMAGE = 10    -- 爆炸基础伤害（主动 / 被动引爆）
+TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方

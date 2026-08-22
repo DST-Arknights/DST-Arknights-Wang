@@ -92,8 +92,8 @@ msgstr "Unlocked at Elite II\nReach max level and elite up at the Training Room"
 
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1"
-msgid "Costs 5 SP\nCan store 5 charges"
-msgstr "Costs 5 SP\nCan store 5 charges"
+msgid "-Detonate deployed black stones within range, each dealing %sx stone damage"
+msgstr "-Detonate deployed black stones within range, each dealing %sx stone damage"
 
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.2
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.2"

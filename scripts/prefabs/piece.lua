@@ -115,6 +115,11 @@ local function SetDeployedState(inst)
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
   inst.AnimState:PlayAnimation("WeiJiHuo", true)
+  -- 随机帧起点：避免读档/同时部署的棋子动画完全同步
+  local numFrames = inst.AnimState:GetCurrentAnimationNumFrames()
+  if numFrames > 0 then
+    inst.AnimState:SetFrame(math.random(numFrames) - 1)
+  end
 end
 
 -- ────────────────────────────────────────────────────────

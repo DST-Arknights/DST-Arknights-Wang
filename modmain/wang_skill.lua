@@ -82,7 +82,7 @@ RegisterTargetSelector("wang_piece_aoe", AreaTargetSelector {
 -- 技能1描述：三级共用模板（LEVEL_DESC.WANG[1][1] 带 %s 倍率占位）
 local function WangSkill1LevelDesc(skill)
   local params = skill:GetLevelParams()
-  return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1][1], params.damageMultiplier)
+  return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1], params.damageMultiplier)
 end
 
 -- 技能1激活测试（取势）：确认选择后（框架传入 targetPos）检查引爆范围内是否有已部署黑子，

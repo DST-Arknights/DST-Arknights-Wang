@@ -90,8 +90,8 @@ msgctxt "STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG.3"
 msgid "Unlocked at Elite II"
 msgstr "-精英化二解锁\n-等级满级后到训练站完成精英化"
 
-#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1
-msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1.1"
+#. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1
+msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1"
 msgid "-Detonate deployed black stones within range, each dealing %sx stone damage"
 msgstr "-引爆指定范围内的已部署黑子，每枚造成 %s 倍黑子伤害"
 

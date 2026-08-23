@@ -223,6 +223,7 @@ local function fn()
   inst.components.complexprojectile:SetHorizontalSpeed(THROW_SPEED)
   inst.components.complexprojectile:SetGravity(THROW_GRAVITY)
   inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
+  inst.components.complexprojectile:SetTargetOffset(Vector3(0, 1.5, 0)) -- 终点Y轴抬高，匹配部署飘浮动画
   inst.components.complexprojectile:SetOnHit(OnTossHit)
   -- 投掷飞行中播放旋转动画（新动画 XuanZuan）
   inst.components.complexprojectile:SetOnLaunch(function()

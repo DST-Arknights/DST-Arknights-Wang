@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spriter_data scml_version="1.0" generator="BrashMonkey Spriter" generator_version="r11">
+	<folder id="0" name="swap_nianzi_sword">
+		<file id="0" name="swap_nianzi_sword/swap_nianzi_sword-0-0.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="1" name="swap_nianzi_sword/swap_nianzi_sword-0-1.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="2" name="swap_nianzi_sword/swap_nianzi_sword-0-2.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="3" name="swap_nianzi_sword/swap_nianzi_sword-0-3.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="4" name="swap_nianzi_sword/swap_nianzi_sword-0-4.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="5" name="swap_nianzi_sword/swap_nianzi_sword-0-5.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="6" name="swap_nianzi_sword/swap_nianzi_sword-0-6.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="7" name="swap_nianzi_sword/swap_nianzi_sword-0-7.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="8" name="swap_nianzi_sword/swap_nianzi_sword-0-8.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+		<file id="9" name="swap_nianzi_sword/swap_nianzi_sword-0-9.png" width="135" height="344" pivot_x="0.53443336" pivot_y="0.19594592" />
+	</folder>
+	<entity id="0" name="swap_nianzi_sword">
+		<animation id="0" name="BUILD" length="33" interval="33">
+			<mainline>
+				<key id="0" time="0">
+					<object_ref id="0" timeline="0" key="0" z_index="0" name="swap_nianzi_sowrd" />
+				</key>
+				<key id="1" time="33">
+					<object_ref id="0" timeline="0" key="1" z_index="0" name="swap_nianzi_sowrd" />
+				</key>
+			</mainline>
+			<timeline id="0" name="swap_nianzi_sowrd">
+				<key id="0" time="0" spin="0" curve_type="instant">
+					<object folder="0" file="0" x="0" y="0" scale_x="1" scale_y="1" angle="0" />
+				</key>
+				<key id="1" time="33" spin="0" curve_type="instant">
+					<object folder="0" file="0" x="0" y="0" scale_x="1" scale_y="1" angle="0" />
+				</key>
+			</timeline>
+		</animation>
+	</entity>
+</spriter_data>

@@ -5,6 +5,64 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 -- 武器：拈子剑（另行实现）
 local ARK_CONSTANTS = require("ark_constants")
 
+-- ════════════════════════════════════════════════════════
+-- 引爆棋子 Action + sg（基于原版 throw_deploy，去掉 useitem_dir_pre 和 symbol 替换）
+-- 链路：技能激活 → PushBufferedAction → sg:wang_detonate_piece 播投掷动画
+--       → Frame 7 PerformBufferedAction → fn 引爆 → animover 回 idle
+-- 动画来源 player_actions_deploytoss.zip（player_common 已加载）
+-- ════════════════════════════════════════════════════════
+
+-- 引爆 action：fn 从 act.options 读取引爆数据（pieces/multiplier），伤害来源 act.doer
+AddAction("DETONATE_PIECE", "DETONATE_PIECE", function(act)
+  local pieces = act.options ~= nil and act.options.pieces
+  if pieces == nil then
+    return true
+  end
+  local multiplier = act.options.multiplier
+  for _, piece in ipairs(pieces) do
+    if piece:IsValid() and piece.ActiveExplode ~= nil then
+      piece:ActiveExplode(act.doer, multiplier)
+    end
+  end
+  return true
+end)
+ACTIONS.DETONATE_PIECE.distance = 0
+
+-- 共享状态（wilson / wilson_client 同一份，同框架 USE_ARK_CURRENCY 模式）：
+-- 服务端 Frame 7 执行引爆；客户端仅播动画（PerformPreviewBufferedAction 无操作）
+-- 参考 throw_deploy：用 timeline FrameEvent 控制结束，不用 animover（多动画序列时 animover 会在第一个动画结束就触发）
+local wangDetonateState = State {
+  name = "wang_detonate_piece",
+  tags = { "doing", "busy" },
+  server_states = { "wang_detonate_piece" },
+  onenter = function(inst, data)
+    local action = inst:GetBufferedAction()
+    if action ~= nil and not TheWorld.ismastersim then
+      inst:PerformPreviewBufferedAction()
+    end
+    inst.components.locomotor:Stop()
+    inst.AnimState:PlayAnimation("deploytoss_pre")
+    inst.AnimState:PushAnimation("deploytoss", false)
+    if action ~= nil and action.pos ~= nil then
+      inst:ForceFacePoint(action:GetActionPoint():Get())
+    end
+  end,
+  timeline = {
+    FrameEvent(7, function(inst)
+      if not TheWorld.ismastersim then
+        return
+      end
+      inst:PerformBufferedAction()
+    end),
+    -- deploytoss_pre (8帧) + deploytoss 动画结束时退出状态
+    FrameEvent(22, function(inst) inst.sg:GoToState("idle") end),
+  },
+}
+AddStategraphState("wilson", wangDetonateState)
+AddStategraphState("wilson_client", wangDetonateState)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.DETONATE_PIECE, "wang_detonate_piece"))
+AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.DETONATE_PIECE, "wang_detonate_piece"))
+
 -- 取势（技能1）
 local WANG_SKILL1_AOE_RANGE = 4     -- 引爆范围（选择点周围）
 local WANG_SKILL1_CAST_RANGE = 20   -- 施法距离（玩家可远程施法，无需走到跟前）
@@ -40,7 +98,7 @@ local function OnWangSkill1ActivateTest(skill, params)
   return true
 end
 
--- 技能1激活（取势）：主动引爆 test 缓存的 targets；data.targetPos 由框架传入
+-- 技能1激活（取势）：Push BufferedAction → sg 播引爆动画 → fn 引爆（不直接触发）
 local function OnWangSkill1Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
@@ -59,18 +117,18 @@ local function OnWangSkill1Activate(skill, data)
     return false, 'SKILL_CANNOT_ACTIVATE'
   end
 
-  -- 每个黑子主动引爆：伤害 = 基础伤害 × 技能倍率（伤害来源为施法者，记击杀）
+  -- 传递技能倍率（棋子内部计算 基础伤害 × 倍率）
   local levelParams = skill:GetLevelParams()
-  local damage = TUNING.WANG.PIECE_BASE_DAMAGE * levelParams.damageMultiplier
-  for _, piece in ipairs(pieces) do
-    if piece:IsValid() and piece.ActiveExplode ~= nil then
-      piece:ActiveExplode(inst, damage)
-    end
-  end
+
+  -- Push BufferedAction → action handler → sg:wang_detonate_piece 播动画 → Frame 7 引爆
+  local buff = BufferedAction(inst, nil, ACTIONS.DETONATE_PIECE, nil, pos, nil, 0, true)
+  buff.options.pieces = pieces
+  buff.options.multiplier = levelParams.damageMultiplier
+  inst:PushBufferedAction(buff)
 
   local x, y, z = pos:Get()
-  ArkLogger:Debug(string.format("取势：选择点(%.1f,%.1f,%.1f) 主动引爆 %d 枚黑子，单发伤害 %.1f",
-    x, y, z, #pieces, damage))
+  ArkLogger:Debug(string.format("取势：选择点(%.1f,%.1f,%.1f) 主动引爆 %d 枚黑子，倍率 %.2f",
+    x, y, z, #pieces, levelParams.damageMultiplier))
 
   return true
 end

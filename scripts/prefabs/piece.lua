@@ -158,7 +158,7 @@ end
 -- ────────────────────────────────────────────────────────
 local function OnHammered(inst, worker)
   if inst._isdeployed then
-    inst:PassiveExplode(worker, TUNING.WANG.PIECE_BASE_DAMAGE)
+    inst:PassiveExplode(worker, 1)  -- 被动引爆倍率 1（无技能加成）
   else
     inst:Remove()
   end
@@ -252,17 +252,24 @@ local function fn()
   -- 引爆方法（挂在棋子实例上，仅部署态有效）
   -- ────────────────────────────────────────────────────────
 
+  -- 棋子基础伤害（内置，便于不同品质/类型扩展）
+  inst._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+
   -- 主动引爆（1技能取势调用）：范围伤害 + 摧毁周围建造物 + 双特效
-  inst.ActiveExplode = function(_, source, damage)
+  -- multiplier: 技能倍率（如 0.9 / 1.1 / 1.3），实际伤害 = 基础伤害 × 倍率
+  inst.ActiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end
+    local damage = inst._baseDamage * (multiplier or 1)
     AoEExplode(inst, source, damage, true)
     SpawnExplodeFx(inst, true)
     inst:Remove()
   end
 
   -- 被动引爆（被锤子 / boss 摧毁时触发）：范围伤害，仅单特效，不摧毁建造物
-  inst.PassiveExplode = function(_, source, damage)
+  -- multiplier: 倍率，默认 1（被动引爆无技能加成）
+  inst.PassiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end
+    local damage = inst._baseDamage * (multiplier or 1)
     AoEExplode(inst, inst, damage, false, source)
     SpawnExplodeFx(inst, false)
     inst:Remove()

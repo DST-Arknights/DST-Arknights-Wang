@@ -91,7 +91,7 @@ local function OnWangSkill1ActivateTest(skill, params)
   local x, y, z = params.targetPos:Get()
   local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL1_AOE_RANGE, { "wang_piece_deployed" }, nil)
   if #pieces == 0 then
-    return false, 'SKILL_CANNOT_ACTIVATE'
+    return false, 'WANG_SKILL1_NO_PIECES'
   end
   -- 缓存引爆目标到 skill 对象（不存 state，state 会处理存档，此缓存无需存档）
   skill._wang_skill1_targets = pieces
@@ -102,7 +102,7 @@ end
 local function OnWangSkill1Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
-    return false, 'SKILL_CANNOT_ACTIVATE'
+    return false, 'WANG_SKILL1_NO_PIECES'
   end
   local pos = data.targetPos
 
@@ -114,7 +114,7 @@ local function OnWangSkill1Activate(skill, data)
     pieces = TheSim:FindEntities(x, y, z, WANG_SKILL1_AOE_RANGE, { "wang_piece_deployed" }, nil)
   end
   if #pieces == 0 then
-    return false, 'SKILL_CANNOT_ACTIVATE'
+    return false, 'WANG_SKILL1_NO_PIECES'
   end
 
   -- 传递技能倍率（棋子内部计算 基础伤害 × 倍率）

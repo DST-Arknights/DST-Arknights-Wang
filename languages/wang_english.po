@@ -184,3 +184,8 @@ msgstr "Generate a Black Stone in your inventory every 15 seconds."
 msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3"
 msgid "Generate a Black Stone in your inventory every 10 seconds."
 msgstr "Generate a Black Stone in your inventory every 10 seconds."
+
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES"
+msgid "No deployed stones in range"
+msgstr "No deployed stones in range"

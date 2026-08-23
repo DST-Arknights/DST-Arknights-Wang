@@ -1,0 +1,74 @@
+-- ════════════════════════════════════════════════════════
+-- 拈子剑：右键落子动作
+-- 链路：装备剑右键点击可通行地面 → POINT collector 生成 WANG_LUOZI
+--       → sg:wang_luozi 播剑攻击动画(atk_pre/atk) → Frame 7 执行 fn
+--       → fn 消耗背包一枚黑子，目标点生成部署态棋子（播 ChuXian 出现动画）
+-- 施法距离：action.distance = 15（玩家会走近到 15 格内执行）
+-- ════════════════════════════════════════════════════════
+
+-- 落子 action：fn 从 act:GetActionPoint() 读取目标地面点，消耗黑子并部署棋子
+AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
+  local doer = act.doer
+  local pos = act:GetActionPoint()
+  if doer == nil or pos == nil then
+    return false
+  end
+  -- 无黑子则失败（不消耗，返回失败原因）
+  if doer.components.inventory == nil or not doer.components.inventory:Has("piece", 1) then
+    return false, "NO_PIECES"
+  end
+  doer.components.inventory:ConsumeByName("piece", 1)
+  local piece = SpawnPrefab("piece")
+  if piece ~= nil then
+    piece:DeployPiece(pos)
+  end
+  return true
+end)
+ACTIONS.WANG_LUOZI.distance = 15 -- 施法 / 走近距离
+ACTIONS.WANG_LUOZI.rmb = true
+
+-- POINT 采集器：装备拈子剑（含 nianzi_sword 组件）右键点击可通行地面时生成落子动作
+-- 背包有黑子才显示；客户端通过 replica.inventory 判断
+AddComponentAction("POINT", "nianzi_sword", function(inst, doer, pos, actions, right, target)
+  if right
+      and doer ~= nil and not doer:HasTag("playerghost")
+      and doer.replica.inventory ~= nil and doer.replica.inventory:Has("piece", 1)
+      and TheWorld.Map ~= nil and not TheWorld.Map:IsGroundTargetBlocked(pos) then
+    table.insert(actions, ACTIONS.WANG_LUOZI)
+  end
+end)
+
+-- 落子 sg（wilson / wilson_client 共享）：
+-- 播剑普通攻击挥一下（atk_pre → atk），Frame 7 执行落子
+-- 结束用 FrameEvent（不用 animover，避免 atk_pre 播完即退）
+-- TODO: 帧数待剑动画确定后微调
+local wangLuoziState = State {
+  name = "wang_luozi",
+  tags = { "doing", "busy" },
+  server_states = { "wang_luozi" },
+  onenter = function(inst, data)
+    local action = inst:GetBufferedAction()
+    if action ~= nil and not TheWorld.ismastersim then
+      inst:PerformPreviewBufferedAction()
+    end
+    inst.components.locomotor:Stop()
+    inst.AnimState:PlayAnimation("atk_pre")
+    inst.AnimState:PushAnimation("atk", false)
+    if action ~= nil and action.pos ~= nil then
+      inst:ForceFacePoint(action:GetActionPoint():Get())
+    end
+  end,
+  timeline = {
+    FrameEvent(7, function(inst)
+      if not TheWorld.ismastersim then
+        return
+      end
+      inst:PerformBufferedAction()
+    end),
+    FrameEvent(15, function(inst) inst.sg:GoToState("idle") end),
+  },
+}
+AddStategraphState("wilson", wangLuoziState)
+AddStategraphState("wilson_client", wangLuoziState)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.WANG_LUOZI, "wang_luozi"))
+AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.WANG_LUOZI, "wang_luozi"))

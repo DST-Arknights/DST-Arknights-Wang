@@ -2,6 +2,7 @@ local MakePlayerCharacter = require "prefabs/player_common"
 
 local assets = {
   Asset("ANIM", "anim/wang.zip"),
+  Asset("ATLAS", "images/map_icons/wang.xml"),
   Asset('ATLAS', 'bigportraits/wang.xml'),
   Asset('ATLAS', 'images/saveslot_portraits/wang.xml'),
   Asset('ATLAS', 'images/selectscreen_portraits/wang.xml'),
@@ -210,6 +211,7 @@ end
 -- 仅服务端执行：组件 / 属性 / 玩法
 -- ════════════════════════════════════════════════════════
 local function master_post_init(inst)
+  inst.MiniMapEntity:SetIcon("wang.tex")
   -- 基础属性（生命上限会随成长逐渐降低，最低为 1）
   inst.components.health:SetMaxHealth(TUNING.WANG_HEALTH)
   inst.components.hunger:SetMax(TUNING.WANG_HUNGER)

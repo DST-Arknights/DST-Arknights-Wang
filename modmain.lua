@@ -19,15 +19,32 @@ RegisterPOFile(GetModConfigData("language"), {
 -- ════════════════════════════════════════════════════════
 -- 角色注册
 -- ════════════════════════════════════════════════════════
-PrefabFiles = {'wang', 'wang_none', 'piece'}
+PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword'}
 
 Assets = {
 }
 
 AddMinimapAtlas('images/map_icons/wang.xml')
+AddMinimapAtlas('images/map_icons/nianzi_sword.xml')
 AddModCharacter("wang", "MALE")
 
 ArkLogger:DeclareLogger('INFO', 'wang')
+
+-- ════════════════════════════════════════════════════════
+-- 拈子剑配方（望专属）：角色 + mods 分类
+-- ════════════════════════════════════════════════════════
+AddCharacterRecipe("nianzi_sword", {
+  Ingredient("goldnugget", 10),
+  Ingredient("livinglog", 10),
+  Ingredient("nightmarefuel", 10),
+}, TECH.NONE, {
+  builder_tag = "wang",
+  atlas = "images/inventoryimages/nianzi_sword.xml",
+  image = "nianzi_sword.tex",
+  description = "NIANZI_SWORD",
+}, {
+  "MODS",
+})
 
 -- ════════════════════════════════════════════════════════
 -- 常量配置
@@ -104,6 +121,7 @@ end
 modimport("modmain/wang_elite")
 modimport("modmain/wang_skill")
 modimport("modmain/wang_talent")
+modimport("modmain/nianzi_sword")
 
 -- ════════════════════════════════════════════════════════
 -- recipe_mastery 组件注册（可复制，全玩家挂载；传授目标也需组件）

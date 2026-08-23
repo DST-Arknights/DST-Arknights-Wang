@@ -276,6 +276,16 @@ local function fn()
     inst:Remove()
   end
 
+  -- 落子部署（拈子剑右键使用）：转移到目标点 → 播 ChuXian 出现动画 → 部署态待机
+  -- pos 需为 Vector3；仅主世界可调用
+  inst.DeployPiece = function(_, pos)
+    if inst._isdeployed then return end
+    inst.Transform:SetPosition(pos.x, pos.y, pos.z)
+    SetDeployedState(inst)
+    inst.AnimState:PlayAnimation("ChuXian", false)
+    inst.AnimState:PushAnimation("WeiJiHuo", true)
+  end
+
   return inst
 end
 

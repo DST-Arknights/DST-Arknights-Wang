@@ -79,10 +79,21 @@ RegisterTargetSelector("wang_piece_aoe", AreaTargetSelector {
   end,
 })
 
--- 技能1描述：三级共用模板（LEVEL_DESC.WANG[1][1] 带 %s 倍率占位）
+-- 技能描述函数：level desc 为空时 skill_desc 回退到 config 层
+-- 技能1描述：三级共用模板（LEVEL_DESC.WANG[1] 带 %s 倍率占位）
 local function WangSkill1LevelDesc(skill)
   local params = skill:GetLevelParams()
   return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1], params.damageMultiplier)
+end
+
+-- 技能2描述：二级共用模板
+local function WangSkill2LevelDesc(skill)
+  return STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[2]
+end
+
+-- 技能3描述：单级模板
+local function WangSkill3LevelDesc(skill)
+  return STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[3]
 end
 
 -- 技能1激活测试（取势）：确认选择后（框架传入 targetPos）检查引爆范围内是否有已部署黑子，
@@ -170,6 +181,7 @@ local skillConfig = {
     id = 'wang_skill2', -- 连星
     name = STRINGS.UI.ARK_SKILL.NAMES.WANG[2],
     lockedDesc = STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG[2],
+    desc = WangSkill2LevelDesc,
     atlas = "images/wang_skill.xml",
     image = "skill_icon_wang_2.tex",
     recipe_atlas = "images/wang_skill.xml",
@@ -178,12 +190,10 @@ local skillConfig = {
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO,
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,
     levels = { {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[2][1],
       activationEnergy = 10,      -- 消耗 SP（设定：10~5）
       maxActivationStacks = 4,    -- 可储存次数（设定：4~6）
       params = {},
     }, {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[2][2],
       activationEnergy = 5,
       maxActivationStacks = 6,
       params = {},
@@ -193,6 +203,7 @@ local skillConfig = {
     id = 'wang_skill3', -- 天下劫
     name = STRINGS.UI.ARK_SKILL.NAMES.WANG[3],
     lockedDesc = STRINGS.UI.ARK_SKILL.LOCKED_DESC.WANG[3],
+    desc = WangSkill3LevelDesc,
     atlas = "images/wang_skill.xml",
     image = "skill_icon_wang_3.tex",
     recipe_atlas = "images/wang_skill.xml",
@@ -201,7 +212,6 @@ local skillConfig = {
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO,
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,
     levels = { {
-      desc = STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[3][1],
       activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
       maxActivationStacks = 1,
       params = {},

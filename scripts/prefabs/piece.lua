@@ -1,14 +1,19 @@
 require "prefabutil"
 
+-- 棋子网格占用表（scripts/wang_piecegrid.lua）：整图分区，每格至多 1 枚
+local Grid = require "wang_piecegrid"
+
 -- ════════════════════════════════════════════════════════
 -- 望的棋子（黑子）
 -- 物品态（可堆叠 / 可装备投掷）→ 投掷落地转部署态
 --   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS，水球模式)
---   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁
+--   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁；无实体碰撞（可走穿，间距由网格管）
 --   激活态   — 部署后由后续机制（如取势）进入：周期检测引爆半径内单位，命中即被动引爆（陷阱）
 --              动画/特效暂未接入，仅逻辑（引爆半径 = 伤害半径，后续可能随某状态翻倍）
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
 --           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
+-- 网格约束：落点所在格已被占/被占位 → 不投掷（服务端拦截）；飞行漂移落入已占格 → 落地为可拾取物品
+-- 占位：投掷起飞即打目标格占位（ReserveCell），超时自动解锁，避免连续投掷堆叠
 -- 引爆：主动(1技能) / 被动(被摧毁 / 激活态探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
@@ -140,6 +145,8 @@ end
 
 -- ────────────────────────────────────────────────────────
 -- 部署态：投掷落地后转地面建筑
+-- 无实体碰撞（RemovePhysicsColliders 只留地面贴合，实体可走穿，间距由网格管）
+-- 网格注册统一走这里：投掷/拈子剑/连星/读档恢复 → 自动重建占用表
 -- ────────────────────────────────────────────────────────
 local function SetDeployedState(inst)
   if inst._isdeployed then
@@ -148,18 +155,26 @@ local function SetDeployedState(inst)
   inst._isdeployed = true
   inst:AddTag("structure")
   inst:AddTag("wang_piece_deployed") -- 已部署标记：供 1 技能引爆检索
-  RemovePhysicsColliders(inst)
-  MakeObstaclePhysics(inst, 0.3)
+  RemovePhysicsColliders(inst)       -- 仅留地面碰撞掩码，不阻挡实体
   inst.Physics:Stop()
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
   inst.AnimState:PlayAnimation("WeiJiHuo", true)
   RandomizeAnimFrame(inst)
+
+  -- 注册网格占用（异常路径兜底：正常部署前调用方已查 IsCellTaken）
+  if TheWorld.ismastersim then
+    local x, _, z = inst.Transform:GetWorldPosition()
+    if not Grid:TryOccupy(x, z, inst) then
+      ArkLogger:Debug("棋子部署但所在格已被占用（异常路径）")
+    end
+  end
 end
 
 -- ────────────────────────────────────────────────────────
 -- 投掷落地（complexprojectile onhit）：
--- 落点附近伤害 + 特效遮盖 + 转部署态（不播出现动画）
+-- 落点附近伤害 + 清投掷占位 + 按落点格占用 → 特效遮盖 + 转部署态（不播出现动画）
+-- 落点格被占（漂移边界）→ 不部署，落地为可拾取物品（不浪费）
 -- ────────────────────────────────────────────────────────
 local function OnTossHit(inst, attacker)
   local x, y, z = inst.Transform:GetWorldPosition()
@@ -169,6 +184,19 @@ local function OnTossHit(inst, attacker)
     if ent ~= nil and ent:IsValid() and ent.components.combat ~= nil
         and attacker ~= nil and attacker:IsValid() then
       ent.components.combat:GetAttacked(attacker, TUNING.WANG.PIECE_THROW_DAMAGE)
+    end
+  end
+
+  -- 网格：清起飞时打的占位 → 落点（吸附可选）查占用 → 被占则不部署
+  if TheWorld.ismastersim then
+    Grid:Detach(inst)
+    local sx, sz = Grid:SnapPos(x, z) -- 吸附 ON → 格中心
+    if sx ~= x or sz ~= z then
+      inst.Transform:SetPosition(sx, y, sz)
+      x, z = sx, sz
+    end
+    if Grid:IsCellTaken(x, z) then
+      return -- 保持物品态，可直接拾取回收
     end
   end
 
@@ -234,6 +262,12 @@ local function fn()
     return TheInput:GetWorldPosition()
   end
 
+  -- 投掷落点网格门禁：目标格已被占（含占位）→ 不显示 TOSS（UI 层）
+  -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）
+  inst.CanTossInWorld = function(_, pos)
+    return not Grid:IsCellTakenForAction(pos.x, pos.z)
+  end
+
   inst.entity:SetPristine()
 
   if not TheWorld.ismastersim then
@@ -243,6 +277,13 @@ local function fn()
   inst._isdeployed = false
   inst._isactive = false -- 激活态（陷阱）标志
   inst._islinked = false -- 连接态（连星）标志
+
+  -- 移除时释放网格占用（爆炸/锤毁/投掷异常等一律兜底）
+  inst:ListenForEvent("onremove", function()
+    if TheWorld.ismastersim then
+      Grid:Detach(inst)
+    end
+  end)
 
   inst:AddComponent("inspectable")
 
@@ -267,9 +308,12 @@ local function fn()
   inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
   inst.components.complexprojectile:SetTargetOffset(Vector3(0, 1.5, 0)) -- 终点Y轴抬高，匹配部署飘浮动画
   inst.components.complexprojectile:SetOnHit(OnTossHit)
-  -- 投掷飞行中播放旋转动画（新动画 XuanZuan）
-  inst.components.complexprojectile:SetOnLaunch(function()
+  -- 投掷飞行中播放旋转动画（新动画 XuanZuan）；并给目标格打占位（避免连续投掷堆叠）
+  inst.components.complexprojectile:SetOnLaunch(function(_, _, targetPos)
     inst.AnimState:PlayAnimation("XuanZuan", true)
+    if TheWorld.ismastersim then
+      Grid:ReserveCell(inst, targetPos.x, targetPos.z)
+    end
   end)
 
   -- 部署态可被锤子 / boss 摧毁

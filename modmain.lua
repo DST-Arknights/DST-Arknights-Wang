@@ -70,8 +70,12 @@ TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
 
 -- 连星（二技能）：棋子连接
 TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数
-TUNING.WANG.PIECE_DEPLOY_SPACING = 2  -- 连星选区自动落子网格间距（地皮）→ 密度 = 1 枚/4地皮²
 TUNING.WANG.PIECE_LINK_RANGE = 1.9     -- 连接搜索半径（当前按选区直连未强制，预留）
+
+-- 棋子网格（全地图分区，每格至多 1 枚已部署棋子；投掷/拈子剑/连星统一约束）
+TUNING.WANG.PIECE_GRID_SIZE = 2            -- 网格边长（地皮）：占用分区 + 连星填充共用
+TUNING.WANG.PIECE_GRID_SNAP = false        -- 部署自动吸附格中心（默认关：落点即落点，格内自由偏移）
+TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT = 3  -- 投掷占位超时（秒），超时自动解锁格子
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方
@@ -127,6 +131,7 @@ modimport("modmain/wang_elite")
 modimport("modmain/wang_skill")
 modimport("modmain/wang_talent")
 modimport("modmain/nianzi_sword")
+modimport("modmain/wang_piecegrid") -- TOSS 服务端拦截（依赖 scripts/wang_piecegrid 与上方 TUNING.WANG）
 
 -- ════════════════════════════════════════════════════════
 -- recipe_mastery 组件注册（可复制，全玩家挂载；传授目标也需组件）

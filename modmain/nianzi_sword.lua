@@ -4,7 +4,9 @@
 --       → sg:wang_luozi 播剑攻击动画(atk_pre/atk) → Frame 7 执行 fn
 --       → fn 消耗背包一枚黑子，目标点生成部署态棋子（播 ChuXian 出现动画）
 -- 施法距离：action.distance = 15（玩家会走近到 15 格内执行）
+-- 网格：落点格已被占/被占位 → 不显示动作（客户端）/ 不消耗不部署（服务端 fn 权威）
 -- ════════════════════════════════════════════════════════
+local Grid = require "wang_piecegrid"
 
 -- 落子 action：fn 从 act:GetActionPoint() 读取目标地面点，消耗黑子并部署棋子
 AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
@@ -17,10 +19,15 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   if doer.components.inventory == nil or not doer.components.inventory:Has("piece", 1) then
     return false, "NO_PIECES"
   end
+  -- 网格检查：落点格已被占/被占位 → 不消耗不部署
+  if Grid:IsCellTaken(pos.x, pos.z) then
+    return false, "CELL_OCCUPIED"
+  end
   doer.components.inventory:ConsumeByName("piece", 1)
   local piece = SpawnPrefab("piece")
   if piece ~= nil then
-    piece:DeployPiece(pos)
+    local sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
+    piece:DeployPiece(Vector3(sx, pos.y, sz))
   end
   return true
 end)
@@ -28,12 +35,13 @@ ACTIONS.WANG_LUOZI.distance = 15 -- 施法 / 走近距离
 ACTIONS.WANG_LUOZI.rmb = true
 
 -- POINT 采集器：装备拈子剑（含 nianzi_sword 组件）右键点击可通行地面时生成落子动作
--- 背包有黑子才显示；客户端通过 replica.inventory 判断
+-- 背包有黑子 + 落点格空闲才显示；客户端通过 replica.inventory / IsCellTakenForAction 判断
 AddComponentAction("POINT", "nianzi_sword", function(inst, doer, pos, actions, right, target)
   if right
       and doer ~= nil and not doer:HasTag("playerghost")
       and doer.replica.inventory ~= nil and doer.replica.inventory:Has("piece", 1)
-      and TheWorld.Map ~= nil and not TheWorld.Map:IsGroundTargetBlocked(pos) then
+      and TheWorld.Map ~= nil and not TheWorld.Map:IsGroundTargetBlocked(pos)
+      and not Grid:IsCellTakenForAction(pos.x, pos.z) then
     table.insert(actions, ACTIONS.WANG_LUOZI)
   end
 end)

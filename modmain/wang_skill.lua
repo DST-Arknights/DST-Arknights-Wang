@@ -4,6 +4,7 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 -- 主动：取势（精英0）/ 连星（精英1）/ 天下劫（精英2）
 -- 武器：拈子剑（另行实现）
 local ARK_CONSTANTS = require("ark_constants")
+local Grid = require("wang_piecegrid")
 
 -- ════════════════════════════════════════════════════════
 -- 引爆棋子 Action + sg（基于原版 throw_deploy，去掉 useitem_dir_pre 和 symbol 替换）
@@ -146,8 +147,9 @@ end
 
 -- ════════════════════════════════════════════════════════
 -- 连星（技能2）：选区填充 + 棋子互连
--- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③互连
+-- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③格邻接互连
 -- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
+-- ③互连规则：只连与自己正交相邻格（上/下/左/右）里的棋子，形成格状连线；不跨格自由连
 -- ════════════════════════════════════════════════════════
 local WANG_SKILL2_AOE_RANGE = 6     -- 选区半径（填充 / 连接范围，大于取势的 4）
 local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
@@ -160,45 +162,36 @@ RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
   pingprefab     = "reticuleaoeping_6",
 })
 
--- ① 选区网格填充：从包里消耗棋子，按 spacing 部署到选区空闲格点（近→远）
--- 避开技能开启前已部署的棋子（不重叠）；跳过不可通行地面；包里棋子用尽即停
+-- ① 选区网格填充：从包里消耗棋子，按世界网格空闲格部署（近→远）
+-- 候选点 = 世界网格格中心 + 施法点偏移：吸附 OFF（默认）把施法点在其格内的偏移复制到各格，
+--          保持"瞄准哪就偏哪"的手感；吸附 ON → 全部落在格中心
+-- 跳过被占格（含投掷占位，与全局网格一致）与不可通行地面；包里棋子用尽即停
 local function DeployPiecesInArea(doer, cx, cz)
-  local spacing = TUNING.WANG.PIECE_DEPLOY_SPACING or 1
+  local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
   local range = WANG_SKILL2_AOE_RANGE
   local inv = doer.components.inventory
   if inv == nil then
     return
   end
 
-  -- 已有部署棋子（技能开启前就存在的，避免重叠部署）
-  local existing = TheSim:FindEntities(cx, 0, cz, range, { "wang_piece_deployed" }, nil)
-  local taken = {}
-  for _, p in ipairs(existing) do
-    if p:IsValid() then
-      local px, _, pz = p.Transform:GetWorldPosition()
-      table.insert(taken, { px, pz })
-    end
+  -- 施法点在其所在格内的偏移（吸附 OFF 时复制到每个填充格；ON 时 offset = 0）
+  local offX, offZ = 0, 0
+  if not TUNING.WANG.PIECE_GRID_SNAP then
+    local ccx, ccz = Grid:CellCenterAt(cx, cz)
+    offX, offZ = cx - ccx, cz - ccz
   end
 
-  -- 网格候选（从圆心向周围扩展，按距离近→远排序）
+  -- 枚举半径内世界网格格中心（+偏移）作为候选，按距离近→远排序
   local candidates = {}
-  local steps = math.ceil(range / spacing)
-  for dx = -steps, steps do
-    for dz = -steps, steps do
-      local gx = cx + dx * spacing
-      local gz = cz + dz * spacing
-      local distsq = (gx - cx) * (gx - cx) + (gz - cz) * (gz - cz)
-      if distsq <= range * range then
-        local free = true
-        for _, t in ipairs(taken) do
-          if (t[1] - gx) * (t[1] - gx) + (t[2] - gz) * (t[2] - gz) < spacing * spacing then
-            free = false
-            break
-          end
-        end
-        if free and TheWorld.Map:IsPassableAtPoint(gx, 0, gz) then
-          table.insert(candidates, { gx, gz, distsq })
-        end
+  for gx = math.floor((cx - range) / grid), math.floor((cx + range) / grid) do
+    for gz = math.floor((cz - range) / grid), math.floor((cz + range) / grid) do
+      local px = (gx + 0.5) * grid + offX
+      local pz = (gz + 0.5) * grid + offZ
+      local distsq = (px - cx) * (px - cx) + (pz - cz) * (pz - cz)
+      if distsq <= range * range
+          and not Grid:IsCellTaken(px, pz)
+          and TheWorld.Map:IsPassableAtPoint(px, 0, pz) then
+        table.insert(candidates, { px, pz, distsq })
       end
     end
   end
@@ -217,7 +210,8 @@ local function DeployPiecesInArea(doer, cx, cz)
   end
 end
 
--- ③ 互连：每棋子连到最近的非满候选，最多 max_links 条
+-- ③ 互连：每棋子只连到与自己正交相邻网格（上/下/左/右）里的棋子，最多 max_links 条
+-- 由"就近自由连"改为"网格邻接连"：候选仅取相邻格棋子，形成整齐格状连线（更美观）
 -- 复用 electricconnector:ConnectTo —— 双向注册自动去重（fields 表）；满 max_links 打 fully_electrically_linked
 local function LinkPiecesInArea(pieces)
   local maxLinks = TUNING.WANG.PIECE_MAX_LINKS or 4
@@ -226,29 +220,24 @@ local function LinkPiecesInArea(pieces)
     if p:IsValid() and p.components.electricconnector ~= nil then
       local pc = p.components.electricconnector
       local px, _, pz = p.Transform:GetWorldPosition()
+      local gx, gz = Grid:CellCoord(px, pz)
 
-      -- 候选：未连接过的 / 对方未满连接数的
-      local candidates = {}
+      -- 候选：与自己正交相邻格里的棋子（未连接过 / 对方未满连接数）
       for j = 1, #pieces do
-        if j ~= i then
+        if j ~= i and GetTableSize(pc.fields) < maxLinks then
           local q = pieces[j]
-          if q:IsValid() then
+          if q:IsValid() and q.components.electricconnector ~= nil then
             local qc = q.components.electricconnector
-            if qc ~= nil and pc.fields[q] == nil and GetTableSize(qc.fields) < maxLinks then
+            if pc.fields[q] == nil and GetTableSize(qc.fields) < maxLinks then
               local qx, _, qz = q.Transform:GetWorldPosition()
-              table.insert(candidates, { q, (qx - px) * (qx - px) + (qz - pz) * (qz - pz) })
+              local qgx, qgz = Grid:CellCoord(qx, qz)
+              local dx = math.abs(gx - qgx)
+              local dz = math.abs(gz - qgz)
+              if (dx == 1 and dz == 0) or (dx == 0 and dz == 1) then
+                pc:ConnectTo(q)
+              end
             end
           end
-        end
-      end
-      table.sort(candidates, function(a, b) return a[2] < b[2] end)
-
-      -- 就近连接；连接前再查一次对方是否已被其他棋子占满
-      for _, c in ipairs(candidates) do
-        if GetTableSize(pc.fields) >= maxLinks then break end
-        local qc = c[1].components.electricconnector
-        if GetTableSize(qc.fields) < maxLinks then
-          pc:ConnectTo(c[1])
         end
       end
     end

@@ -144,6 +144,157 @@ local function OnWangSkill1Activate(skill, data)
   return true
 end
 
+-- ════════════════════════════════════════════════════════
+-- 连星（技能2）：选区填充 + 棋子互连
+-- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③互连
+-- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
+-- ════════════════════════════════════════════════════════
+local WANG_SKILL2_AOE_RANGE = 6     -- 选区半径（填充 / 连接范围，大于取势的 4）
+local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
+
+-- 连星区域选择器（同取势视觉：reticuleaoe 环 + 落点 ping）
+RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
+  range          = WANG_SKILL2_CAST_RANGE,
+  deployradius   = 0,
+  reticuleprefab = "reticuleaoe_6",
+  pingprefab     = "reticuleaoeping_6",
+})
+
+-- ① 选区网格填充：从包里消耗棋子，按 spacing 部署到选区空闲格点（近→远）
+-- 避开技能开启前已部署的棋子（不重叠）；跳过不可通行地面；包里棋子用尽即停
+local function DeployPiecesInArea(doer, cx, cz)
+  local spacing = TUNING.WANG.PIECE_DEPLOY_SPACING or 1
+  local range = WANG_SKILL2_AOE_RANGE
+  local inv = doer.components.inventory
+  if inv == nil then
+    return
+  end
+
+  -- 已有部署棋子（技能开启前就存在的，避免重叠部署）
+  local existing = TheSim:FindEntities(cx, 0, cz, range, { "wang_piece_deployed" }, nil)
+  local taken = {}
+  for _, p in ipairs(existing) do
+    if p:IsValid() then
+      local px, _, pz = p.Transform:GetWorldPosition()
+      table.insert(taken, { px, pz })
+    end
+  end
+
+  -- 网格候选（从圆心向周围扩展，按距离近→远排序）
+  local candidates = {}
+  local steps = math.ceil(range / spacing)
+  for dx = -steps, steps do
+    for dz = -steps, steps do
+      local gx = cx + dx * spacing
+      local gz = cz + dz * spacing
+      local distsq = (gx - cx) * (gx - cx) + (gz - cz) * (gz - cz)
+      if distsq <= range * range then
+        local free = true
+        for _, t in ipairs(taken) do
+          if (t[1] - gx) * (t[1] - gx) + (t[2] - gz) * (t[2] - gz) < spacing * spacing then
+            free = false
+            break
+          end
+        end
+        if free and TheWorld.Map:IsPassableAtPoint(gx, 0, gz) then
+          table.insert(candidates, { gx, gz, distsq })
+        end
+      end
+    end
+  end
+  table.sort(candidates, function(a, b) return a[3] < b[3] end)
+
+  -- 部署：每消耗一枚包里棋子 → 生成一个新棋子到该格点
+  for _, c in ipairs(candidates) do
+    if not inv:Has("piece", 1) then
+      break -- 包里棋子用尽
+    end
+    inv:ConsumeByName("piece", 1)
+    local piece = SpawnPrefab("piece")
+    if piece ~= nil then
+      piece:DeployPiece(Vector3(c[1], 0, c[2]))
+    end
+  end
+end
+
+-- ③ 互连：每棋子连到最近的非满候选，最多 max_links 条
+-- 复用 electricconnector:ConnectTo —— 双向注册自动去重（fields 表）；满 max_links 打 fully_electrically_linked
+local function LinkPiecesInArea(pieces)
+  local maxLinks = TUNING.WANG.PIECE_MAX_LINKS or 4
+  for i = 1, #pieces do
+    local p = pieces[i]
+    if p:IsValid() and p.components.electricconnector ~= nil then
+      local pc = p.components.electricconnector
+      local px, _, pz = p.Transform:GetWorldPosition()
+
+      -- 候选：未连接过的 / 对方未满连接数的
+      local candidates = {}
+      for j = 1, #pieces do
+        if j ~= i then
+          local q = pieces[j]
+          if q:IsValid() then
+            local qc = q.components.electricconnector
+            if qc ~= nil and pc.fields[q] == nil and GetTableSize(qc.fields) < maxLinks then
+              local qx, _, qz = q.Transform:GetWorldPosition()
+              table.insert(candidates, { q, (qx - px) * (qx - px) + (qz - pz) * (qz - pz) })
+            end
+          end
+        end
+      end
+      table.sort(candidates, function(a, b) return a[2] < b[2] end)
+
+      -- 就近连接；连接前再查一次对方是否已被其他棋子占满
+      for _, c in ipairs(candidates) do
+        if GetTableSize(pc.fields) >= maxLinks then break end
+        local qc = c[1].components.electricconnector
+        if GetTableSize(qc.fields) < maxLinks then
+          pc:ConnectTo(c[1])
+        end
+      end
+    end
+  end
+end
+
+-- 技能2激活测试（连星）：选区有已部署棋子（可直接连接）或包里还有棋子（可填充）才合法
+-- 返回 false → 不消耗技能充能
+local function OnWangSkill2ActivateTest(skill, params)
+  if params == nil or params.targetPos == nil then
+    return false
+  end
+  local x, y, z = params.targetPos:Get()
+  local hasAreaPieces = #TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil) > 0
+  local hasInvPieces = skill.inst.components.inventory ~= nil
+    and skill.inst.components.inventory:Has("piece", 1)
+  return hasAreaPieces or hasInvPieces
+end
+
+-- 技能2激活（连星）：① 网格填充 → ② 全选区已部署棋子转连接态 → ③ 互连
+local function OnWangSkill2Activate(skill, data)
+  local inst = skill.inst
+  if data == nil or data.targetPos == nil then
+    return false
+  end
+  local x, y, z = data.targetPos:Get()
+
+  -- ① 用包里棋子填充选区（到满，避开已有棋子）
+  DeployPiecesInArea(inst, x, z)
+
+  -- ② 全选区已部署棋子（含新填的）→ 连接态（非激活态，不自动引爆，移除碰撞体积）
+  local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
+  for _, p in ipairs(pieces) do
+    if p:IsValid() and p.EnterLinkState ~= nil then
+      p:EnterLinkState()
+    end
+  end
+
+  -- ③ 互相连接（每棋子最多连 max_links 个最近棋子）
+  LinkPiecesInArea(pieces)
+
+  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", x, z, #pieces))
+
+  return true
+end
+
 local skillConfig = {
   {
     id = 'wang_skill1', -- 取势
@@ -189,6 +340,9 @@ local skillConfig = {
     hotkey = KEY_X,
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO,
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,
+    targetSelector = "wang_skill2_area",
+    ActivateTest = OnWangSkill2ActivateTest,
+    OnActivate = OnWangSkill2Activate,
     levels = { {
       activationEnergy = 10,      -- 消耗 SP（设定：10~5）
       maxActivationStacks = 4,    -- 可储存次数（设定：4~6）

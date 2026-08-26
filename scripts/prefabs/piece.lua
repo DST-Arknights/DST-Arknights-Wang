@@ -5,9 +5,11 @@ require "prefabutil"
 -- 物品态（可堆叠 / 可装备投掷）→ 投掷落地转部署态
 --   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS，水球模式)
 --   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁
+--   激活态   — 部署后由后续机制（如取势）进入：周期检测引爆半径内单位，命中即被动引爆（陷阱）
+--              动画/特效暂未接入，仅逻辑（引爆半径 = 伤害半径，后续可能随某状态翻倍）
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
 --           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
--- 引爆：主动(1技能) / 被动(被摧毁) 两种范围伤害，参考火药爆炸
+-- 引爆：主动(1技能) / 被动(被摧毁 / 激活态探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
 --   XuanZuan — 投掷飞行旋转
@@ -23,6 +25,17 @@ local THROW_AOE = 1       -- 落地伤害范围
 
 -- 爆炸数值（modmain 可调）
 local EXPLODE_RANGE = TUNING.WANG.PIECE_EXPLODE_RANGE or 4 -- 爆炸半径
+
+-- 激活态（陷阱）数值
+-- 引爆半径 = 伤害半径 = EXPLODE_RANGE（单一数据源，二者自动同步）
+-- 注意：后续某状态（如天下劫）下该值可能翻倍，检测与伤害共用，改这一处即可
+local PROX_CHECK_INTERVAL = 1 -- 激活态检测周期（秒）
+
+-- 激活态目标筛选（参考蜜蜂地雷 mine 组件）
+-- 触发：怪物 / 动物 / 敌对角色；"player" 加入禁止表 → 玩家（含望自己）不会触发陷阱
+local PROX_ONEOF_TAGS = { "monster", "character", "animal" }
+local PROX_MUST_TAGS = { "_combat" }
+local PROX_NO_TAGS = { "notraptrigger", "flying", "ghost", "playerghost", "spawnprotection", "player" }
 
 RegisterInventoryItemAtlas("images/inventoryimages/piece.xml", "piece.tex")
 
@@ -100,6 +113,32 @@ local function SpawnExplodeFx(inst, active)
 end
 
 -- ────────────────────────────────────────────────────────
+-- 激活态被动引爆：周期检测引爆半径内目标，命中即直接爆炸（陷阱）
+-- 参考蜜蜂地雷 mine 组件（DoPeriodicTask + FindEntity）
+-- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸本身对所有可攻击目标造成伤害，不摧毁建造物
+-- ────────────────────────────────────────────────────────
+local function PassiveDetonateCheck(inst)
+  local target = FindEntity(inst, EXPLODE_RANGE, function(dude)
+    return not (dude.components.health ~= nil and dude.components.health:IsDead())
+      and dude.components.combat ~= nil and dude.components.combat:CanBeAttacked(inst)
+  end, PROX_MUST_TAGS, PROX_NO_TAGS, PROX_ONEOF_TAGS)
+  if target ~= nil then
+    inst:PassiveExplode(nil, 1) -- 被动引爆：范围伤害、不摧毁建造物、不记击杀
+  end
+end
+
+-- ────────────────────────────────────────────────────────
+-- 随机帧起点：避免读档/同时部署的棋子动画完全同步
+-- 供所有转到未激活动画(WeiJiHuo)时调用
+-- ────────────────────────────────────────────────────────
+local function RandomizeAnimFrame(inst)
+  local numFrames = inst.AnimState:GetCurrentAnimationNumFrames()
+  if numFrames > 0 then
+    inst.AnimState:SetFrame(math.random(numFrames) - 1)
+  end
+end
+
+-- ────────────────────────────────────────────────────────
 -- 部署态：投掷落地后转地面建筑
 -- ────────────────────────────────────────────────────────
 local function SetDeployedState(inst)
@@ -115,11 +154,7 @@ local function SetDeployedState(inst)
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
   inst.AnimState:PlayAnimation("WeiJiHuo", true)
-  -- 随机帧起点：避免读档/同时部署的棋子动画完全同步
-  local numFrames = inst.AnimState:GetCurrentAnimationNumFrames()
-  if numFrames > 0 then
-    inst.AnimState:SetFrame(math.random(numFrames) - 1)
-  end
+  RandomizeAnimFrame(inst)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -206,6 +241,8 @@ local function fn()
   end
 
   inst._isdeployed = false
+  inst._isactive = false -- 激活态（陷阱）标志
+  inst._islinked = false -- 连接态（连星）标志
 
   inst:AddComponent("inspectable")
 
@@ -242,15 +279,38 @@ local function fn()
   inst.components.workable:SetOnFinishCallback(OnHammered)
   inst.components.workable:SetWorkable(false)
 
-  -- 部署状态存档：读档后恢复为地面建筑
+  -- 连接态（连星）：复用原版 electricconnector，连接/断开/读档重连全内置
+  -- max_links=4（每棋子最多连 4 个）；field_prefab 为连接光束（仅视觉，电击后续接入）
+  -- 组件惰性：只有 EnterLinkState 后 ConnectTo 才真正建连，平时无副作用
+  inst:AddComponent("electricconnector")
+  inst.components.electricconnector.max_links = TUNING.WANG.PIECE_MAX_LINKS or 4
+  inst.components.electricconnector.link_range = TUNING.WANG.PIECE_LINK_RANGE or 10
+  inst.components.electricconnector.field_prefab = "piece_link_field"
+  -- 组件构造会打 electric_connector 标签，导致原版麻刺节点(Fence)自动搜索时找到棋子，
+  -- 而棋子无状态机(sg) → CanLinkTo 里 IsLinking() 崩溃。移除标签：棋子只按技能直连，不参与自动搜索
+  inst:RemoveTag("electric_connector")
+
+  -- 部署/激活/连接状态存档：读档后恢复为地面建筑（激活态陷阱重新武装 / 连接态重连由 electricconnector 的 OnSave/LoadPostPass 负责）
   inst.OnSave = function(inst, data)
     if inst._isdeployed then
       data.isdeployed = true
+    end
+    if inst._isactive then
+      data.isactive = true
+    end
+    if inst._islinked then
+      data.islinked = true
     end
   end
   inst.OnLoad = function(inst, data)
     if data ~= nil and data.isdeployed then
       SetDeployedState(inst)
+    end
+    if data ~= nil and data.isactive then
+      inst:SetPieceActivated(true)
+    end
+    if data ~= nil and data.islinked then
+      inst:EnterLinkState()
     end
   end
 
@@ -281,14 +341,43 @@ local function fn()
     inst:Remove()
   end
 
+  -- 激活态（陷阱）：进入后周期检测引爆半径内单位，命中即被动引爆
+  -- 动画/特效暂未接入；进入退出时机由后续机制（如取势）调用，当前未接触发
+  -- 仅部署态有效；引爆倍率固定 1（取势陷阱的 0.9/1.1/1.3 倍率后续接触发时再传）
+  inst.SetPieceActivated = function(_, armed)
+    if not inst._isdeployed then return end
+    if armed and not inst._isactive then
+      inst._isactive = true
+      inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, math.random() * 0.5)
+    elseif not armed and inst._isactive then
+      inst._isactive = false
+      if inst._proxTask ~= nil then
+        inst._proxTask:Cancel()
+        inst._proxTask = nil
+      end
+    end
+  end
+
+  -- 连接态（连星）：进入后移除碰撞体积；不是激活态，不会自动引爆
+  -- 连接本身由 electricconnector 管理（ConnectTo 建连 / 读档 LoadPostPass 重连）
+  -- 可重复调用（幂等）：已是连接态则直接返回
+  inst.EnterLinkState = function(_)
+    if not inst._isdeployed or inst._islinked then
+      return
+    end
+    inst._islinked = true
+    inst:SetPieceActivated(false) -- 连接态不是激活态：取消陷阱武装（防御性）
+    inst.Physics:SetCollides(false) -- 移除碰撞体积
+  end
+
   -- 落子部署（拈子剑右键使用）：转移到目标点 → 播 ChuXian 出现动画 → 部署态待机
   -- pos 需为 Vector3；仅主世界可调用
   inst.DeployPiece = function(_, pos)
     if inst._isdeployed then return end
     inst.Transform:SetPosition(pos.x, pos.y, pos.z)
     SetDeployedState(inst)
-    inst.AnimState:PlayAnimation("ChuXian", false)
-    inst.AnimState:PushAnimation("WeiJiHuo", true)
+    -- ChuXian 已不再用于部署，直接播放未激活动画并随机起始帧
+    -- SetDeployedState 内部已调用 RandomizeAnimFrame，此处无需再调用
   end
 
   return inst

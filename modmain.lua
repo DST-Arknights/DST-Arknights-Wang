@@ -19,7 +19,7 @@ RegisterPOFile(GetModConfigData("language"), {
 -- ════════════════════════════════════════════════════════
 -- 角色注册
 -- ════════════════════════════════════════════════════════
-PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword'}
+PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx'}
 
 Assets = {
 }
@@ -67,6 +67,11 @@ TUNING.WANG.EAT_EFFECT_MULTIPLIER = 0.5 -- 进食饥饿恢复（0.5倍）
 TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
 TUNING.WANG.PIECE_BASE_DAMAGE = 10    -- 爆炸基础伤害（主动 / 被动引爆）
 TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
+
+-- 连星（二技能）：棋子连接
+TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数
+TUNING.WANG.PIECE_DEPLOY_SPACING = 2  -- 连星选区自动落子网格间距（地皮）→ 密度 = 1 枚/4地皮²
+TUNING.WANG.PIECE_LINK_RANGE = 1.9     -- 连接搜索半径（当前按选区直连未强制，预留）
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方

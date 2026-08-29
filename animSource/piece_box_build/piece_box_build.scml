@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spriter_data scml_version="1.0" generator="BrashMonkey Spriter" generator_version="r11">
+	<folder id="0" name="body">
+		<file id="0" name="body/body-0.png" width="132" height="119" pivot_x="0.508913" pivot_y="0.582655" />
+		<file id="1" name="body/body-1.png" width="158" height="100" pivot_x="0.507921" pivot_y="0.653067" />
+		<file id="2" name="body/body-2.png" width="124" height="128" pivot_x="0.555859" pivot_y="0.545203" />
+		<file id="3" name="body/body-3.png" width="132" height="113" pivot_x="0.495087" pivot_y="0.552642" />
+		<file id="4" name="body/body-4.png" width="155" height="151" pivot_x="0.486461" pivot_y="0.484055" />
+		<file id="5" name="body/body-5.png" width="156" height="132" pivot_x="0.478215" pivot_y="0.500557" />
+		<file id="6" name="body/body-6.png" width="159" height="138" pivot_x="0.506299" pivot_y="0.462852" />
+		<file id="7" name="body/body-7.png" width="145" height="119" pivot_x="0.530355" pivot_y="0.58108" />
+		<file id="8" name="body/body-8.png" width="130" height="124" pivot_x="0.516935" pivot_y="0.563899" />
+		<file id="9" name="body/body-9.png" width="151" height="138" pivot_x="0.504315" pivot_y="0.462852" />
+	</folder>
+	<folder id="1" name="hair">
+		<file id="0" name="hair/hair-0.png" width="17" height="29" pivot_x="0.370676" pivot_y="0.506845" />
+	</folder>
+	<folder id="2" name="head">
+		<file id="0" name="head/head-0.png" width="132" height="105" pivot_x="0.510617" pivot_y="0.547843" />
+		<file id="1" name="head/head-1.png" width="121" height="105" pivot_x="0.516283" pivot_y="0.552664" />
+		<file id="2" name="head/head-2.png" width="132" height="105" pivot_x="0.51308" pivot_y="0.547843" />
+		<file id="3" name="head/head-3.png" width="137" height="102" pivot_x="0.510047" pivot_y="0.531113" />
+		<file id="4" name="head/head-4.png" width="137" height="119" pivot_x="0.510047" pivot_y="0.599725" />
+	</folder>
+	<folder id="3" name="ear">
+		<file id="0" name="ear/ear-0.png" width="62" height="73" pivot_x="0.457791" pivot_y="0.11367801" />
+		<file id="1" name="ear/ear-1.png" width="62" height="69" pivot_x="0.457786" pivot_y="0.06374639" />
+	</folder>
+	<folder id="4" name="eye">
+		<file id="0" name="eye/eye-0.png" width="53" height="56" pivot_x="0.477783" pivot_y="0.533971" />
+		<file id="1" name="eye/eye-1.png" width="49" height="42" pivot_x="0.521273" pivot_y="0.538143" />
+		<file id="2" name="eye/eye-2.png" width="43" height="21" pivot_x="0.503186" pivot_y="0.699554" />
+		<file id="3" name="eye/eye-3.png" width="48" height="29" pivot_x="0.475394" pivot_y="0.591009" />
+		<file id="4" name="eye/eye-4.png" width="43" height="50" pivot_x="0.492181" pivot_y="0.436922" />
+		<file id="5" name="eye/eye-5.png" width="47" height="44" pivot_x="0.520989" pivot_y="0.452846" />
+		<file id="6" name="eye/eye-6.png" width="36" height="18" pivot_x="0.511944" pivot_y="0.60617" />
+		<file id="7" name="eye/eye-7.png" width="48" height="36" pivot_x="0.502974" pivot_y="0.525555" />
+		<file id="8" name="eye/eye-8.png" width="40" height="19" pivot_x="0.513162" pivot_y="0.672289" />
+		<file id="9" name="eye/eye-9.png" width="43" height="19" pivot_x="0.552361" pivot_y="0.447289" />
+		<file id="10" name="eye/eye-10.png" width="51" height="56" pivot_x="0.472786" pivot_y="0.540016" />
+		<file id="11" name="eye/eye-11.png" width="47" height="43" pivot_x="0.484074" pivot_y="0.458105" />
+		<file id="12" name="eye/eye-12.png" width="48" height="41" pivot_x="0.501594" pivot_y="0.481671" />
+	</folder>
+	<folder id="5" name="nose">
+		<file id="0" name="nose/nose-0.png" width="26" height="36" pivot_x="0.533699" pivot_y="0.415724" />
+		<file id="1" name="nose/nose-1.png" width="26" height="36" pivot_x="0.539419" pivot_y="0.474865" />
+		<file id="2" name="nose/nose-2.png" width="26" height="36" pivot_x="0.526741" pivot_y="0.571185" />
+		<file id="3" name="nose/nose-3.png" width="26" height="36" pivot_x="0.533699" pivot_y="0.455384" />
+		<file id="4" name="nose/nose-4.png" width="26" height="36" pivot_x="0.520785" pivot_y="0.474865" />
+		<file id="5" name="nose/nose-5.png" width="26" height="36" pivot_x="0.20642698" pivot_y="0.772556" />
+		<file id="6" name="nose/nose-6.png" width="26" height="36" pivot_x="0.171644" pivot_y="0.270415" />
+		<file id="7" name="nose/nose-7.png" width="26" height="36" pivot_x="0.536054" pivot_y="0.415724" />
+		<file id="8" name="nose/nose-8.png" width="26" height="36" pivot_x="0.53752" pivot_y="0.49945" />
+		<file id="9" name="nose/nose-9.png" width="26" height="36" pivot_x="0.569217" pivot_y="0.457565" />
+		<file id="10" name="nose/nose-10.png" width="26" height="36" pivot_x="0.534214" pivot_y="0.611905" />
+		<file id="11" name="nose/nose-11.png" width="26" height="36" pivot_x="0.510651" pivot_y="0.455384" />
+		<file id="12" name="nose/nose-12.png" width="26" height="36" pivot_x="0.528854" pivot_y="0.601974" />
+	</folder>
+	<folder id="6" name="leg">
+		<file id="0" name="leg/leg-0.png" width="21" height="38" pivot_x="0.49769" pivot_y="0.713776" />
+		<file id="1" name="leg/leg-1.png" width="22" height="38" pivot_x="0.475068" pivot_y="0.713776" />
+		<file id="2" name="leg/leg-2.png" width="22" height="38" pivot_x="0.484159" pivot_y="0.713776" />
+		<file id="3" name="leg/leg-3.png" width="33" height="49" pivot_x="0.681864" pivot_y="0.780582" />
+		<file id="4" name="leg/leg-4.png" width="26" height="39" pivot_x="0.554865" pivot_y="0.71791" />
+		<file id="5" name="leg/leg-5.png" width="33" height="53" pivot_x="0.426561" pivot_y="0.530632" />
+	</folder>
+	<folder id="7" name="water_drop">
+		<file id="0" name="water_drop/water_drop-0.png" width="20" height="34" pivot_x="0.501325" pivot_y="0.498485" />
+	</folder>
+	<folder id="8" name="chest">
+		<file id="0" name="chest/chest-0.png" width="157" height="102" pivot_x="0.528035" pivot_y="0.546431" />
+		<file id="1" name="chest/chest-1.png" width="124" height="98" pivot_x="0.536302" pivot_y="0.508435" />
+	</folder>
+	<folder id="9" name="shadow">
+		<file id="0" name="shadow/shadow-0.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+	</folder>
+	<folder id="10" name="testtail">
+		<file id="0" name="testtail/testtail-0.png" width="102" height="100" pivot_x="0.442723" pivot_y="0.37709" />
+		<file id="1" name="testtail/testtail-1.png" width="66" height="67" pivot_x="0.531462" pivot_y="0.486731" />
+		<file id="2" name="testtail/testtail-2.png" width="66" height="69" pivot_x="0.472845" pivot_y="0.518638" />
+		<file id="3" name="testtail/testtail-3.png" width="69" height="65" pivot_x="0.495312" pivot_y="0.5369" />
+		<file id="4" name="testtail/testtail-4.png" width="62" height="61" pivot_x="0.517766" pivot_y="0.56227" />
+		<file id="5" name="testtail/testtail-5.png" width="92" height="115" pivot_x="0.539011" pivot_y="0.444824" />
+	</folder>
+	<folder id="11" name="catcoon_tail">
+		<file id="0" name="catcoon_tail/catcoon_tail-0.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="1" name="catcoon_tail/catcoon_tail-1.png" width="156" height="375" pivot_x="0.517077" pivot_y="0.05119601" />
+		<file id="2" name="catcoon_tail/catcoon_tail-2.png" width="102" height="362" pivot_x="0.85181797" pivot_y="0.058867693" />
+		<file id="3" name="catcoon_tail/catcoon_tail-3.png" width="66" height="230" pivot_x="0.381462" pivot_y="0.317657" />
+		<file id="4" name="catcoon_tail/catcoon_tail-4.png" width="242" height="96" pivot_x="0.915203" pivot_y="0.50512" />
+		<file id="5" name="catcoon_tail/catcoon_tail-5.png" width="250" height="120" pivot_x="0.889021" pivot_y="0.283841" />
+		<file id="6" name="catcoon_tail/catcoon_tail-6.png" width="222" height="148" pivot_x="0.89459" pivot_y="0.214573" />
+		<file id="7" name="catcoon_tail/catcoon_tail-7.png" width="235" height="124" pivot_x="0.930176" pivot_y="0.21696198" />
+		<file id="8" name="catcoon_tail/catcoon_tail-8.png" width="205" height="171" pivot_x="0.916386" pivot_y="0.528082" />
+		<file id="9" name="catcoon_tail/catcoon_tail-9-0.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="10" name="catcoon_tail/catcoon_tail-9-1.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="11" name="catcoon_tail/catcoon_tail-9-2.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="12" name="catcoon_tail/catcoon_tail-9-3.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="13" name="catcoon_tail/catcoon_tail-9-4.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="14" name="catcoon_tail/catcoon_tail-9-5.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="15" name="catcoon_tail/catcoon_tail-9-6.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="16" name="catcoon_tail/catcoon_tail-9-7.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="17" name="catcoon_tail/catcoon_tail-9-8.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="18" name="catcoon_tail/catcoon_tail-9-9.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="19" name="catcoon_tail/catcoon_tail-9-10.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="20" name="catcoon_tail/catcoon_tail-9-11.png" width="100" height="100" pivot_x="0.5" pivot_y="0.5" />
+		<file id="21" name="catcoon_tail/catcoon_tail-21.png" width="128" height="227" pivot_x="0.473715" pivot_y="0.106051" />
+	</folder>
+	<folder id="12" name="cheeks">
+		<file id="0" name="cheeks/cheeks-0.png" width="75" height="72" pivot_x="0.663502" pivot_y="0.501427" />
+		<file id="1" name="cheeks/cheeks-1.png" width="64" height="63" pivot_x="0.283185" pivot_y="0.562531" />
+	</folder>
+	<folder id="13" name="foot">
+		<file id="0" name="foot/foot-0.png" width="20" height="18" pivot_x="0.412575" pivot_y="0.630472" />
+		<file id="1" name="foot/foot-1.png" width="24" height="24" pivot_x="0.507354" pivot_y="0.297333" />
+		<file id="2" name="foot/foot-2.png" width="23" height="19" pivot_x="0.776696" pivot_y="0.6565" />
+	</folder>
+	<folder id="14" name="mask">
+		<file id="0" name="mask/mask-0.png" width="43" height="24" pivot_x="0.482593" pivot_y="-0.4914691" />
+		<file id="1" name="mask/mask-1.png" width="22" height="20" pivot_x="-0.6442499" pivot_y="-1.0432" />
+	</folder>
+	<entity id="0" name="bank0">
+		<animation id="0" name="animation0" length="33" interval="33">
+			<mainline />
+		</animation>
+	</entity>
+</spriter_data>

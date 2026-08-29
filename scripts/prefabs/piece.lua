@@ -18,7 +18,7 @@ local Grid = require "wang_piecegrid"
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
 --   XuanZuan — 投掷飞行旋转
---   ChuXian  — 出现（已不再用于部署）
+--   ChuXian  — 出现（拈子剑单次落子与二技能批量部署都播）
 --   WeiJiHuo — 未激活（部署态待机）
 --   JiHuo    — 激活
 -- ════════════════════════════════════════════════════════
@@ -143,24 +143,48 @@ local function RandomizeAnimFrame(inst)
   end
 end
 
+local function DisableEntityCollisions(inst)
+  if inst.Physics ~= nil then
+    inst.Physics:SetCollisionMask(COLLISION.GROUND)
+    inst.Physics:Stop()
+  end
+end
+
 -- ────────────────────────────────────────────────────────
--- 部署态：投掷落地后转地面建筑
--- 无实体碰撞（RemovePhysicsColliders 只留地面贴合，实体可走穿，间距由网格管）
+-- 部署态：投掷落地 / 技能放置后转地面建筑
+-- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
 -- 网格注册统一走这里：投掷/拈子剑/连星/读档恢复 → 自动重建占用表
 -- ────────────────────────────────────────────────────────
-local function SetDeployedState(inst)
+local function SetDeployedState(inst, deploydata)
   if inst._isdeployed then
     return
   end
+  deploydata = deploydata or {}
+
   inst._isdeployed = true
   inst:AddTag("structure")
   inst:AddTag("wang_piece_deployed") -- 已部署标记：供 1 技能引爆检索
-  RemovePhysicsColliders(inst)       -- 仅留地面碰撞掩码，不阻挡实体
-  inst.Physics:Stop()
+  DisableEntityCollisions(inst)
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
-  inst.AnimState:PlayAnimation("WeiJiHuo", true)
-  RandomizeAnimFrame(inst)
+  if deploydata.playappear then
+    inst.AnimState:PlayAnimation("ChuXian", false)
+    inst.AnimState:PushAnimation("WeiJiHuo", true)
+    -- 出现动画播完转 WeiJiHuo 后随机起始帧（拈子剑/二技能批量部署也避免动画全同步）
+    -- 一次性监听：首次 animover 正是 ChuXian 结束（或 WeiJiHuo 首个循环），命中即随机并解绑
+    -- 先声明再赋值：闭包内自引用 onAppearDone 需指向本 local（local 作用域自赋值语句之后才开始）
+    local onAppearDone
+    onAppearDone = function()
+      if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
+        RandomizeAnimFrame(inst)
+        inst:RemoveEventCallback("animover", onAppearDone)
+      end
+    end
+    inst:ListenForEvent("animover", onAppearDone)
+  else
+    inst.AnimState:PlayAnimation("WeiJiHuo", true)
+    RandomizeAnimFrame(inst)
+  end
 
   -- 注册网格占用（异常路径兜底：正常部署前调用方已查 IsCellTaken）
   if TheWorld.ismastersim then
@@ -196,6 +220,8 @@ local function OnTossHit(inst, attacker)
       x, z = sx, sz
     end
     if Grid:IsCellTaken(x, z) then
+      -- 落点格被占：恢复物品态待机动画（投掷飞行中播的是 XuanZuan 旋转）
+      inst.AnimState:PlayAnimation("idle", true)
       return -- 保持物品态，可直接拾取回收
     end
   end
@@ -244,6 +270,7 @@ local function fn()
   inst.entity:AddNetwork()
 
   MakeInventoryPhysics(inst)
+  DisableEntityCollisions(inst)
 
   -- 物品态：普通物品的表现（背包/地上显示 idle）
   inst.AnimState:SetBank("piece")
@@ -264,7 +291,8 @@ local function fn()
 
   -- 投掷落点网格门禁：目标格已被占（含占位）→ 不显示 TOSS（UI 层）
   -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）
-  inst.CanTossInWorld = function(_, pos)
+  -- 签名 (self, doer, pos)：采集器冒号调用 inst:CanTossInWorld(doer, pos)
+  inst.CanTossInWorld = function(_, doer, pos)
     return not Grid:IsCellTakenForAction(pos.x, pos.z)
   end
 
@@ -333,6 +361,9 @@ local function fn()
   -- 组件构造会打 electric_connector 标签，导致原版麻刺节点(Fence)自动搜索时找到棋子，
   -- 而棋子无状态机(sg) → CanLinkTo 里 IsLinking() 崩溃。移除标签：棋子只按技能直连，不参与自动搜索
   inst:RemoveTag("electric_connector")
+  -- 取消该组件的菜单动作注册：连接(连星)完全由技能 ConnectTo 管理，不向玩家暴露原版
+  -- 手动操作（左键"打开连接"=STARTELECTRICLINK / 右键"断开连接"=ENDELECTRICLINK）
+  inst:UnregisterComponentActions("electricconnector")
 
   -- 部署/激活/连接状态存档：读档后恢复为地面建筑（激活态陷阱重新武装 / 连接态重连由 electricconnector 的 OnSave/LoadPostPass 负责）
   inst.OnSave = function(inst, data)
@@ -402,7 +433,7 @@ local function fn()
     end
   end
 
-  -- 连接态（连星）：进入后移除碰撞体积；不是激活态，不会自动引爆
+  -- 连接态（连星）：不是激活态，不会自动引爆
   -- 连接本身由 electricconnector 管理（ConnectTo 建连 / 读档 LoadPostPass 重连）
   -- 可重复调用（幂等）：已是连接态则直接返回
   inst.EnterLinkState = function(_)
@@ -411,17 +442,15 @@ local function fn()
     end
     inst._islinked = true
     inst:SetPieceActivated(false) -- 连接态不是激活态：取消陷阱武装（防御性）
-    inst.Physics:SetCollides(false) -- 移除碰撞体积
   end
 
-  -- 落子部署（拈子剑右键使用）：转移到目标点 → 播 ChuXian 出现动画 → 部署态待机
-  -- pos 需为 Vector3；仅主世界可调用
-  inst.DeployPiece = function(_, pos)
+  -- 落子部署（拈子剑 / 连星复用）：转移到目标点后进入部署态
+  -- pos 需为 Vector3；deploydata.playappear=true 时先播 ChuXian，再转 WeiJiHuo
+  -- 仅主世界可调用
+  inst.DeployPiece = function(_, pos, deploydata)
     if inst._isdeployed then return end
     inst.Transform:SetPosition(pos.x, pos.y, pos.z)
-    SetDeployedState(inst)
-    -- ChuXian 已不再用于部署，直接播放未激活动画并随机起始帧
-    -- SetDeployedState 内部已调用 RandomizeAnimFrame，此处无需再调用
+    SetDeployedState(inst, deploydata)
   end
 
   return inst

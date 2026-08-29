@@ -27,7 +27,7 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   local piece = SpawnPrefab("piece")
   if piece ~= nil then
     local sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
-    piece:DeployPiece(Vector3(sx, pos.y, sz))
+    piece:DeployPiece(Vector3(sx, pos.y, sz), { playappear = true })
   end
   return true
 end)

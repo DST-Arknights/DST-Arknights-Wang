@@ -19,7 +19,7 @@ RegisterPOFile(GetModConfigData("language"), {
 -- ════════════════════════════════════════════════════════
 -- 角色注册
 -- ════════════════════════════════════════════════════════
-PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx'}
+PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box'}
 
 Assets = {
 }
@@ -145,7 +145,36 @@ end)
 modimport("modmain/recipe_mastery")
 
 -- ════════════════════════════════════════════════════════
--- 初始物品（待实现：兽形棋盒）
+-- 棋盒主人组件（宠物式存在）：棋盒 follow 态存档数据由主人管理
 -- ════════════════════════════════════════════════════════
--- local StartItems = {"wang_chess_box"}
--- TUNING.GAMEMODE_STARTING_ITEMS.DEFAULT.WANG = StartItems
+AddPlayerPostInit(function(inst)
+  if TheWorld.ismastersim and not inst.components.wang_chess_box_owner then
+    inst:AddComponent("wang_chess_box_owner")
+  end
+end)
+
+-- ════════════════════════════════════════════════════════
+-- 兽形棋盒：容器 UI 配置 + 起始物品
+-- ════════════════════════════════════════════════════════
+-- containers 是游戏模块（非全局），需 require 后注册容器 UI 配置
+-- 4 格储物 UI（2×2）。暂用原版 ui_chest_2x2，等棋盒专属容器 UI 资源补齐后替换 animbank/animbuild
+local containers = require("containers")
+containers.params["piece_box"] = {
+  widget = {
+    slotpos = {
+      Vector3(-37.5, 32 + 4, 0),
+      Vector3(37.5, 32 + 4, 0),
+      Vector3(-37.5, -(32 + 4), 0),
+      Vector3(37.5, -(32 + 4), 0),
+    },
+    animbank = "ui_chest_2x2",
+    animbuild = "ui_chest_2x2",
+    pos = Vector3(200, 0, 0),
+    side_align_tip = 120,
+  },
+  type = "chest",
+}
+
+-- 初始物品（兽形棋盒）：望出生自带，可拾取进背包 / 放下跟随
+local StartItems = { "piece_box" }
+TUNING.GAMEMODE_STARTING_ITEMS.DEFAULT.WANG = StartItems

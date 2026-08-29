@@ -185,6 +185,16 @@ msgctxt "STRINGS.CHARACTERS.WANG.NIANZI_SWORD_DESC"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "He is simply used to placing a stone before things happen."
 
+#. STRINGS.NAMES.WANG_CHESS_BOX
+msgctxt "STRINGS.NAMES.WANG_CHESS_BOX"
+msgid "Chess Box"
+msgstr "Chess Box"
+
+#. STRINGS.CHARACTERS.WANG.WANG_CHESS_BOX_DESC
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_CHESS_BOX_DESC"
+msgid "A beast-shaped chess box that follows its builder."
+msgstr "A beast-shaped chess box that follows its builder."
+
 #. STRINGS.ACTIONS.WANG_LUOZI
 msgctxt "STRINGS.ACTIONS.WANG_LUOZI"
 msgid "Luozi"

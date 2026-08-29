@@ -185,6 +185,16 @@ msgctxt "STRINGS.CHARACTERS.WANG.NIANZI_SWORD_DESC"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "他只是习惯在事情发生之前，先落下一子。"
 
+#. STRINGS.NAMES.WANG_CHESS_BOX
+msgctxt "STRINGS.NAMES.WANG_CHESS_BOX"
+msgid "Chess Box"
+msgstr "兽形棋盒"
+
+#. STRINGS.CHARACTERS.WANG.WANG_CHESS_BOX_DESC
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_CHESS_BOX_DESC"
+msgid "A beast-shaped chess box that follows its builder."
+msgstr "一只总跟在望身边的兽形棋盒。"
+
 #. STRINGS.ACTIONS.WANG_LUOZI
 msgctxt "STRINGS.ACTIONS.WANG_LUOZI"
 msgid "Luozi"

@@ -163,6 +163,7 @@ RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
 })
 
 -- ① 选区网格填充：从包里消耗棋子，按世界网格空闲格部署（近→远）
+--    批量部署也播 ChuXian 出现动画（与拈子剑一致），随后转 WeiJiHuo 待机
 -- 候选点 = 世界网格格中心 + 施法点偏移：吸附 OFF（默认）把施法点在其格内的偏移复制到各格，
 --          保持"瞄准哪就偏哪"的手感；吸附 ON → 全部落在格中心
 -- 跳过被占格（含投掷占位，与全局网格一致）与不可通行地面；包里棋子用尽即停
@@ -205,7 +206,7 @@ local function DeployPiecesInArea(doer, cx, cz)
     inv:ConsumeByName("piece", 1)
     local piece = SpawnPrefab("piece")
     if piece ~= nil then
-      piece:DeployPiece(Vector3(c[1], 0, c[2]))
+      piece:DeployPiece(Vector3(c[1], 0, c[2]), { playappear = true })
     end
   end
 end
@@ -244,6 +245,67 @@ local function LinkPiecesInArea(pieces)
   end
 end
 
+-- ════════════════════════════════════════════════════════
+-- 连星 Action + sg（同取势：走施法动画后执行填充+连接）
+-- 链路：技能激活 → PushBufferedAction → sg:wang_lianxing_piece 播投掷动画
+--       → Frame 7 PerformBufferedAction → fn 填充+连接 → Frame 22 回 idle
+-- 动画来源 player_actions_deploytoss.zip（player_common 已加载）
+-- ════════════════════════════════════════════════════════
+
+-- 连星 action：fn 从 act.options 读取选区中心，执行填充 + 连接（仅服务端执行）
+AddAction("LIANXING_PIECE", "LIANXING_PIECE", function(act)
+  local opts = act.options
+  if opts == nil or opts.x == nil or opts.z == nil or act.doer == nil then
+    return true
+  end
+  DeployPiecesInArea(act.doer, opts.x, opts.z)
+  local pieces = TheSim:FindEntities(opts.x, 0, opts.z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
+  for _, p in ipairs(pieces) do
+    if p:IsValid() and p.EnterLinkState ~= nil then
+      p:EnterLinkState()
+    end
+  end
+  LinkPiecesInArea(pieces)
+  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", opts.x, opts.z, #pieces))
+  return true
+end)
+ACTIONS.LIANXING_PIECE.distance = 0
+
+-- 共享状态（wilson / wilson_client 同一份，同框架 USE_ARK_CURRENCY 模式）：
+-- 服务端 Frame 7 执行填充+连接；客户端仅播动画（PerformPreviewBufferedAction 无操作）
+-- 与取势共用同一套投掷动画与时间轴（deploytoss_pre + deploytoss，Frame 22 回 idle）
+local wangLianxingState = State {
+  name = "wang_lianxing_piece",
+  tags = { "doing", "busy" },
+  server_states = { "wang_lianxing_piece" },
+  onenter = function(inst, data)
+    local action = inst:GetBufferedAction()
+    if action ~= nil and not TheWorld.ismastersim then
+      inst:PerformPreviewBufferedAction()
+    end
+    inst.components.locomotor:Stop()
+    inst.AnimState:PlayAnimation("deploytoss_pre")
+    inst.AnimState:PushAnimation("deploytoss", false)
+    if action ~= nil and action.pos ~= nil then
+      inst:ForceFacePoint(action:GetActionPoint():Get())
+    end
+  end,
+  timeline = {
+    FrameEvent(7, function(inst)
+      if not TheWorld.ismastersim then
+        return
+      end
+      inst:PerformBufferedAction()
+    end),
+    -- deploytoss_pre (8帧) + deploytoss 动画结束时退出状态
+    FrameEvent(22, function(inst) inst.sg:GoToState("idle") end),
+  },
+}
+AddStategraphState("wilson", wangLianxingState)
+AddStategraphState("wilson_client", wangLianxingState)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
+AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
+
 -- 技能2激活测试（连星）：选区有已部署棋子（可直接连接）或包里还有棋子（可填充）才合法
 -- 返回 false → 不消耗技能充能
 local function OnWangSkill2ActivateTest(skill, params)
@@ -257,29 +319,22 @@ local function OnWangSkill2ActivateTest(skill, params)
   return hasAreaPieces or hasInvPieces
 end
 
--- 技能2激活（连星）：① 网格填充 → ② 全选区已部署棋子转连接态 → ③ 互连
+-- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 执行填充+连接
+-- 实际逻辑（填充/连接态/互连）在 action fn（LIANXING_PIECE）中随施法动画帧执行
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
     return false
   end
-  local x, y, z = data.targetPos:Get()
+  local pos = data.targetPos
 
-  -- ① 用包里棋子填充选区（到满，避开已有棋子）
-  DeployPiecesInArea(inst, x, z)
+  -- Push BufferedAction → action handler → sg:wang_lianxing_piece 播动画 → Frame 7 执行
+  local buff = BufferedAction(inst, nil, ACTIONS.LIANXING_PIECE, nil, pos, nil, 0, true)
+  buff.options.x = pos.x
+  buff.options.z = pos.z
+  inst:PushBufferedAction(buff)
 
-  -- ② 全选区已部署棋子（含新填的）→ 连接态（非激活态，不自动引爆，移除碰撞体积）
-  local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
-  for _, p in ipairs(pieces) do
-    if p:IsValid() and p.EnterLinkState ~= nil then
-      p:EnterLinkState()
-    end
-  end
-
-  -- ③ 互相连接（每棋子最多连 max_links 个最近棋子）
-  LinkPiecesInArea(pieces)
-
-  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", x, z, #pieces))
+  ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入施法动画", pos.x, pos.z))
 
   return true
 end

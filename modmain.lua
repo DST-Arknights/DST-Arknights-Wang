@@ -162,27 +162,60 @@ end)
 local containers = require("containers")
 
 -- 原版 specialized container 只扫描主物品栏；补充扫描头部装备栏中的云兽。
-AddComponentPostInit("inventory", function(self)
-  local GetSpecializedContainers = self.GetSpecializedContainers
-  self.GetSpecializedContainers = function(inventory, ...)
-    local specialized = GetSpecializedContainers(inventory, ...)
-    if inventory.ignorespoverflow then
-      return specialized
-    end
-
-    local equipped = inventory:GetEquippedItem(EQUIPSLOTS.HEAD)
-    local container = equipped ~= nil and equipped.prefab == "piece_box"
-      and equipped.components.container or nil
-    if container ~= nil and container.priorityfn ~= nil
-        and container.canbeopened
-        and not (container.droponopen or container.inst:HasTag("portablecontainer")) then
-      specialized = specialized or {}
-      if not table.contains(specialized, container) then
-        table.insert(specialized, container)
-      end
-    end
+local function IncludeEquippedPieceBox(next, inventory, ...)
+  local specialized = next(inventory, ...)
+  if inventory.ignorespoverflow then
     return specialized
   end
+
+  local equipped = inventory:GetEquippedItem(EQUIPSLOTS.HEAD)
+  local container = equipped ~= nil and equipped.prefab == "piece_box"
+    and equipped.components.container or nil
+  if container ~= nil and container.priorityfn ~= nil
+      and container.canbeopened
+      and not (container.droponopen or container.inst:HasTag("portablecontainer")) then
+    specialized = specialized or {}
+    if not table.contains(specialized, container) then
+      table.insert(specialized, container)
+    end
+  end
+  return specialized
+end
+
+-- 原版会为 specialized container 自动调用 Open；仅在棋子自动入盒期间临时跳过该分支。
+local function GivePieceToBoxSilently(next, inventory, item, ...)
+  if item == nil or item.prefab ~= "piece" then
+    return next(inventory, item, ...)
+  end
+
+  local tagged = {}
+  local specialized = inventory:GetSpecializedContainers()
+  if specialized ~= nil then
+    for _, container in ipairs(specialized) do
+      if container.inst.prefab == "piece_box"
+          and container:ShouldPrioritizeContainer(item)
+          and not container.inst:HasTag("portablestorage") then
+        container.inst:AddTag("portablestorage")
+        table.insert(tagged, container.inst)
+      end
+    end
+  end
+
+  local ok, result = pcall(next, inventory, item, ...)
+  for _, inst in ipairs(tagged) do
+    if inst:IsValid() then
+      inst:RemoveTag("portablestorage")
+    end
+  end
+  if not ok then
+    error(result, 0)
+  end
+  return result
+end
+
+AddComponentPostInit("inventory", function(self)
+  ArkHookFunction(self, "GetSpecializedContainers", IncludeEquippedPieceBox)
+  ArkHookFunction(self, "GiveItem", GivePieceToBoxSilently)
 end)
 
 containers.params["piece_box"] = {

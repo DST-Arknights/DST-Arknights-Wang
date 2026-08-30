@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════
 -- 兽形棋盒（跟随容器，宠物式存在）
--- 动画：复用 catcoon（bank=catcoon / build=catcoon_build），后续切换棋盒专属 build
+-- 动画：复用 kitcoon 的 bank 与 basic 动画，使用棋盒专属 build
 -- 跟随：参考切斯特（brain 跟随 follower.leader），leader = 放下它的建造者/持有者
 -- 拾取：inventoryitem canbepickedup(alive)，左键拾取进物品栏（右键打开由容器接管）
 -- 容器：4 格储物，infinitestacksize = 无普通堆叠上限（容器组件 SetIgnoreMaxSize）
@@ -9,17 +9,22 @@
 --                         读档不会重复触发进包事件），存档唯一来源是主人
 --                         wang_chess_box_owner 组件（捕获 GetSaveRecord 含容器）
 --   进出背包事件（SetOnPutInInventoryFn/SetOnDroppedFn）驱动主人组件 TrackBox 记录模式
--- 交互（原版动作解析天然支持）：左键 PICKUP(优先级1) / 右键 RUMMAGE(打开,-1)
---       有 container 且无 equippable → 右键不提供 PICKUP（componentactions 477 行）
--- 穿戴（头戴保暖/防水）、回san光环、偷吃等后续实现
+-- 交互（原版动作解析天然支持）：地面可拾取/打开，物品栏内可装备至头部
+-- 穿戴：实体自身通过 FollowSymbol 挂到头部，不覆盖玩家动画符号
 -- ════════════════════════════════════════════════════════
+RegisterInventoryItemAtlas("images/inventoryimages/piece_box.xml", "piece_box.tex")
 
 local brain = require "brains/piece_boxbrain"
 
+local WRONG_ITEM_COMMENT_CHANCE = 0.5
+
 local assets = {
-  Asset("ANIM", "anim/catcoon_basic.zip"),
-  Asset("ANIM", "anim/catcoon_actions.zip"),
-  Asset("ANIM", "anim/catcoon_build.zip"),
+  Asset("ANIM", "anim/kitcoon_basic.zip"),
+  Asset("ANIM", "anim/kitcoon_emotes.zip"),
+  Asset("ANIM", "anim/kitcoon_jump.zip"),
+  Asset("ANIM", "anim/piece_box_build.zip"),
+  Asset("ATLAS", "images/inventoryimages/piece_box.xml"),
+  Asset("ATLAS", "images/map_icons/piece_box.xml"),
 }
 
 -- ────────────────────────────────────────────────────────
@@ -35,6 +40,60 @@ local function OnClose(inst)
   if inst.sg ~= nil then
     inst.sg:GoToState("close")
   end
+end
+
+local function OnItemGet(inst, data)
+  local item = data ~= nil and data.item or nil
+  local user = inst.components.container.currentuser
+  if item ~= nil and item.prefab ~= "piece"
+      and user ~= nil and user:IsValid()
+      and inst.components.container:IsOpenedBy(user)
+      and user.components.talker ~= nil
+      and math.random() < WRONG_ITEM_COMMENT_CHANCE then
+    user.components.talker:Say(GetString(user, "ANNOUNCE_PIECE_BOX_WRONG_ITEM"))
+  end
+end
+
+local function OnEquip(inst, owner)
+  if inst.components.container ~= nil then
+    inst.components.container:Close(owner)
+  end
+  inst:ReturnToScene()
+  inst.Physics:SetActive(false)
+  inst.DynamicShadow:Enable(false)
+  inst.entity:SetParent(owner.entity)
+  inst.Follower:FollowSymbol(owner.GUID, "headbase", -20, -120, 0)
+  inst.AnimState:PlayAnimation("idle_loop", true)
+end
+
+local function OnUnequip(inst)
+  inst.Follower:StopFollowing()
+  inst.Physics:SetActive(true)
+  inst.DynamicShadow:Enable(true)
+  inst:RemoveFromScene()
+end
+
+local function OnEquipToModel(inst)
+  inst.Follower:StopFollowing()
+  inst:RemoveFromScene()
+end
+
+local WAKE_TO_FOLLOW_DISTANCE = 14
+local SLEEP_NEAR_LEADER_DISTANCE = 7
+
+local function ShouldWakeUp(inst)
+  return DefaultWakeTest(inst)
+    or (inst.components.follower ~= nil
+      and inst.components.follower:GetLeader() ~= nil
+      and not inst.components.follower:IsNearLeader(WAKE_TO_FOLLOW_DISTANCE))
+end
+
+local function ShouldSleep(inst)
+  return DefaultSleepTest(inst)
+    and not (inst.sg ~= nil and inst.sg:HasStateTag("open"))
+    and (inst.components.follower == nil
+      or inst.components.follower:GetLeader() == nil
+      or inst.components.follower:IsNearLeader(SLEEP_NEAR_LEADER_DISTANCE))
 end
 
 -- 按 userid 找在线玩家（读档/跨会话找回主人）
@@ -104,6 +163,8 @@ local function fn()
   inst.entity:AddAnimState()
   inst.entity:AddSoundEmitter()
   inst.entity:AddDynamicShadow()
+  inst.entity:AddMiniMapEntity()
+  inst.entity:AddFollower()
   inst.entity:AddNetwork()
 
   MakeCharacterPhysics(inst, 1, 0.5)
@@ -115,16 +176,21 @@ local function fn()
   )
 
   inst:AddTag("companion")     -- 跟随者
+  inst:AddTag("kitcoon")       -- 允许与其它 kitcoon 进行玩耍互动
   inst:AddTag("scarytoprey")
   inst:AddTag("notraptrigger")
   inst:AddTag("noauradamage")
   inst:AddTag("NOBLOCK")
+  inst:AddTag("hat")
+  inst:AddTag("waterproofer")
 
   inst.DynamicShadow:SetSize(1.5, 1)
-  inst.Transform:SetFourFaced()
+  inst.MiniMapEntity:SetIcon("piece_box.tex")
+  inst.MiniMapEntity:SetCanUseCache(false)
+  inst.Transform:SetSixFaced()
 
-  inst.AnimState:SetBank("catcoon")
-  inst.AnimState:SetBuild("catcoon_build")
+  inst.AnimState:SetBuild("piece_box_build")
+  inst.AnimState:SetBank("kitcoon")
   inst.AnimState:PlayAnimation("idle_loop", true)
 
   inst.entity:SetPristine()
@@ -137,9 +203,6 @@ local function fn()
   inst.persists = false
 
   inst:AddComponent("inspectable")
-  inst.components.inspectable.descriptionfn = function()
-    return STRINGS.CHARACTERS.WANG.WANG_CHESS_BOX_DESC
-  end
   inst.components.inspectable:RecordViews()
 
   -- 可拾取进物品栏（活物拾取）
@@ -147,19 +210,47 @@ local function fn()
   inst.components.inventoryitem.canbepickedup = true
   inst.components.inventoryitem.canbepickedupalive = true
   inst.components.inventoryitem.nobounce = true
-  -- 物品图标占位：暂用黑子图标（等棋盒图标资源补齐后替换）
-  inst.components.inventoryitem.atlasname = "images/inventoryimages/piece.xml"
-  inst.components.inventoryitem.imagename = "piece.tex"
   inst.components.inventoryitem:SetOnPutInInventoryFn(OnPutInInventory)
   inst.components.inventoryitem:SetOnDroppedFn(OnDropped)
+
+  inst:AddComponent("equippable")
+  inst.components.equippable.equipslot = EQUIPSLOTS.HEAD
+  inst.components.equippable:SetOnEquip(OnEquip)
+  inst.components.equippable:SetOnUnequip(OnUnequip)
+  inst.components.equippable:SetOnEquipToModel(OnEquipToModel)
+
+  inst:AddComponent("insulator")
+  inst.components.insulator:SetInsulation(120)
+
+  inst:AddComponent("waterproofer")
+  inst.components.waterproofer:SetEffectiveness(0.8)
+
+  inst:AddComponent("sanityaura")
+  inst.components.sanityaura.aura = TUNING.SANITYAURA_TINY
 
   -- 跟随移动
   inst:AddComponent("locomotor")
   inst.components.locomotor.walkspeed = 3
   inst.components.locomotor.runspeed = 7
+  inst.components.locomotor.softstop = true
+  inst.components.locomotor:SetTriggersCreep(false)
   inst.components.locomotor:SetAllowPlatformHopping(true)
 
   inst:AddComponent("follower")
+  inst.components.follower.neverexpire = true
+  inst.components.follower.keepleaderduringminigame = true
+
+  -- Chester/kitcoon 的船只上下船链路。无 health 组件本身即不会受伤或死亡。
+  inst:AddComponent("embarker")
+  inst.components.embarker.embark_speed = inst.components.locomotor.walkspeed + 2
+  inst:AddComponent("drownable")
+
+  inst:AddComponent("sleeper")
+  inst.components.sleeper.watchlight = true
+  inst.components.sleeper:SetResistance(3)
+  inst.components.sleeper.testperiod = GetRandomWithVariance(6, 2)
+  inst.components.sleeper:SetSleepTest(ShouldSleep)
+  inst.components.sleeper:SetWakeTest(ShouldWakeUp)
 
   -- 容器：4 格储物，内部物品无普通堆叠上限
   inst:AddComponent("container")
@@ -168,6 +259,7 @@ local function fn()
   inst.components.container.onclosefn = OnClose
   inst.components.container.canbeopened = true
   inst.components.container:EnableInfiniteStackSize(true) -- 只读属性，须用 setter（同步 replica + 现有物品 SetIgnoreMaxSize）
+  inst:ListenForEvent("itemget", OnItemGet)
 
   -- 主人 userid 存档：跨会话"放下棋盒→找回主人"兜底（随主人组件 GetSaveRecord 一并记录）
   inst.OnSave = function(_, data)

@@ -13,6 +13,7 @@ local assets = {
   Asset("ANIM", "anim/nianzi_sword.zip"),
   Asset("ANIM", "anim/swap_nianzi_sword.zip"),
   Asset("ATLAS", "images/inventoryimages/nianzi_sword.xml"),
+  Asset("ATLAS", "images/map_icons/nianzi_sword.xml")
 }
 
 local function onequip(inst, owner)
@@ -51,6 +52,8 @@ local function fn()
   inst.entity:AddAnimState()
   inst.entity:AddSoundEmitter()
   inst.entity:AddNetwork()
+  inst.entity:AddMiniMapEntity()
+  inst.MiniMapEntity:SetIcon("nianzi_sword.tex")
 
   MakeInventoryPhysics(inst)
 

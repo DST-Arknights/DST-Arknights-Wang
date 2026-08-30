@@ -1,15 +1,38 @@
--- ════════════════════════════════════════════════════════
--- 棋盒 SG（类切斯特结构，动画用 catcoon 占位）
--- 打开/关闭：catcoon 无"开盖"动画，暂用 taunt(仰起) 作打开、idle 作关闭
---           （后续切换棋盒 build 时替换成正式 open/close 动画）
--- 行走：复用 CommonStates.AddWalkStates（walk_pre/walk_loop/walk_pst）
--- ════════════════════════════════════════════════════════
+-- 棋盒 SG：使用 kitcoon 的基础动作，并接入 Chester 的船只/落水状态。
 require "stategraphs/commonstates"
 
 local events = {
   CommonHandlers.OnStep(),
-  CommonHandlers.OnLocomote(false, true),
+  CommonHandlers.OnLocomote(true, true),
+  CommonHandlers.OnSleepEx(),
+  CommonHandlers.OnWakeEx(),
+  CommonHandlers.OnHop(),
+  CommonHandlers.OnSink(),
+  CommonHandlers.OnFallInVoid(),
+  EventHandler("kitcoonplaywithme", function(inst, data)
+    if data ~= nil and data.target ~= nil and data.target:IsValid() and not inst.sg:HasStateTag("busy") then
+      inst.sg:GoToState("playful", data)
+    end
+  end),
+  EventHandler("start_playwithplaymate", function(inst, data)
+    if data ~= nil and data.target ~= nil and data.target:IsValid() and not inst.sg:HasStateTag("busy") then
+      inst.sg:GoToState("playful", data)
+      data.target:PushEvent("kitcoonplaywithme", { target = inst })
+    end
+  end),
 }
+
+local actionhandlers = {
+  ActionHandler(ACTIONS.NUZZLE, "nuzzle"),
+  ActionHandler(ACTIONS.CATPLAYGROUND, "catplayground"),
+  ActionHandler(ACTIONS.CATPLAYAIR, "catplayair"),
+}
+
+local function GoToIdle(inst)
+  if inst.AnimState:AnimDone() then
+    inst.sg:GoToState("idle")
+  end
+end
 
 local states = {
   State {
@@ -21,42 +44,97 @@ local states = {
     end,
   },
 
-  -- 打开（容器 onopenfn 触发）
   State {
     name = "open",
     tags = { "busy", "open" },
     onenter = function(inst)
       inst.Physics:Stop()
-      inst.AnimState:PlayAnimation("taunt") -- 占位：仰起 = 开盖
-    end,
-    events = {
-      EventHandler("animover", function(inst) inst.sg:GoToState("open_idle") end),
-    },
-  },
-
-  -- 打开待机（容器 UI 开启期间循环）
-  State {
-    name = "open_idle",
-    tags = { "busy", "open" },
-    onenter = function(inst)
-      inst.AnimState:PlayAnimation("idle_loop", true)
+      if inst.components.sleeper ~= nil then
+        inst.components.sleeper:WakeUp()
+      end
+      inst.AnimState:PlayAnimation("hiding_small", true)
     end,
   },
 
-  -- 关闭（容器 onclosefn 触发）
   State {
     name = "close",
     tags = { "busy" },
     onenter = function(inst)
-      inst.AnimState:PlayAnimation("idle")
+      inst.AnimState:PlayAnimation("sleep_pst", false)
     end,
     events = {
       EventHandler("animover", function(inst) inst.sg:GoToState("idle") end),
     },
   },
+
+  State {
+    name = "nuzzle",
+    tags = { "busy", "canrotate" },
+    onenter = function(inst)
+      inst.Physics:Stop()
+      local leader = inst.components.follower:GetLeader()
+      if leader ~= nil then
+        inst:ForceFacePoint(leader.Transform:GetWorldPosition())
+      end
+      inst.AnimState:PlayAnimation("emote_nuzzle", false)
+    end,
+    events = {
+      EventHandler("animover", GoToIdle),
+    },
+  },
+
+  State {
+    name = "playful",
+    tags = { "busy", "canrotate", "playful" },
+    onenter = function(inst, data)
+      inst.Physics:Stop()
+      if data ~= nil and data.target ~= nil and data.target:IsValid() then
+        inst:ForceFacePoint(data.target.Transform:GetWorldPosition())
+      end
+      inst.AnimState:PlayAnimation("interact_active", false)
+    end,
+    events = {
+      EventHandler("animover", GoToIdle),
+    },
+  },
+
+  State {
+    name = "catplayground",
+    tags = { "busy", "canrotate", "jumping" },
+    onenter = function(inst, data)
+      inst.Physics:Stop()
+      if data ~= nil and data.target ~= nil and data.target:IsValid() then
+        inst:ForceFacePoint(data.target.Transform:GetWorldPosition())
+      end
+      inst.AnimState:PlayAnimation("emote_cute", false)
+    end,
+    events = {
+      EventHandler("animover", GoToIdle),
+    },
+  },
+
+  State {
+    name = "catplayair",
+    tags = { "busy", "canrotate", "jumping" },
+    onenter = function(inst, data)
+      inst.Physics:Stop()
+      if data ~= nil and data.target ~= nil and data.target:IsValid() then
+        inst:ForceFacePoint(data.target.Transform:GetWorldPosition())
+      end
+      inst.AnimState:PlayAnimation("emote_cute", false)
+    end,
+    events = {
+      EventHandler("animover", GoToIdle),
+    },
+  },
 }
 
 CommonStates.AddWalkStates(states, {}, { startwalk = "walk_pre", walk = "walk_loop", stopwalk = "walk_pst" }, true)
+CommonStates.AddRunStates(states, nil, { startrun = "walk_pre", run = "walk_loop", stoprun = "walk_pst" })
+CommonStates.AddSleepExStates(states)
+CommonStates.AddHopStates(states, true)
+CommonStates.AddSinkAndWashAshoreStates(states)
+CommonStates.AddVoidFallStates(states)
 CommonStates.AddInitState(states, "idle")
 
-return StateGraph("piece_box", states, events, "init")
+return StateGraph("piece_box", states, events, "init", actionhandlers)

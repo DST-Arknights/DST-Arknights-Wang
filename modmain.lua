@@ -26,6 +26,7 @@ Assets = {
 
 AddMinimapAtlas('images/map_icons/wang.xml')
 AddMinimapAtlas('images/map_icons/nianzi_sword.xml')
+AddMinimapAtlas('images/map_icons/piece_box.xml')
 AddModCharacter("wang", "MALE")
 
 ArkLogger:DeclareLogger('INFO', 'wang')

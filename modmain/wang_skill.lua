@@ -5,6 +5,7 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 -- 武器：拈子剑（另行实现）
 local ARK_CONSTANTS = require("ark_constants")
 local Grid = require("wang_piecegrid")
+local PieceResource = require("wang_piece_resource")
 
 -- ════════════════════════════════════════════════════════
 -- 引爆棋子 Action + sg（基于原版 throw_deploy，去掉 useitem_dir_pre 和 symbol 替换）
@@ -200,10 +201,9 @@ local function DeployPiecesInArea(doer, cx, cz)
 
   -- 部署：每消耗一枚包里棋子 → 生成一个新棋子到该格点
   for _, c in ipairs(candidates) do
-    if not inv:Has("piece", 1) then
+    if not PieceResource.TryConsume(doer, 1) then
       break -- 包里棋子用尽
     end
-    inv:ConsumeByName("piece", 1)
     local piece = SpawnPrefab("piece")
     if piece ~= nil then
       piece:DeployPiece(Vector3(c[1], 0, c[2]), { playappear = true })
@@ -314,8 +314,7 @@ local function OnWangSkill2ActivateTest(skill, params)
   end
   local x, y, z = params.targetPos:Get()
   local hasAreaPieces = #TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil) > 0
-  local hasInvPieces = skill.inst.components.inventory ~= nil
-    and skill.inst.components.inventory:Has("piece", 1)
+  local hasInvPieces = PieceResource.HasAny(skill.inst)
   return hasAreaPieces or hasInvPieces
 end
 

@@ -148,6 +148,7 @@ modimport("modmain/recipe_mastery")
 -- ════════════════════════════════════════════════════════
 -- 棋盒主人组件（宠物式存在）：棋盒 follow 态存档数据由主人管理
 -- ════════════════════════════════════════════════════════
+AddReplicableComponent("wang_chess_box_owner")
 AddPlayerPostInit(function(inst)
   if TheWorld.ismastersim and not inst.components.wang_chess_box_owner then
     inst:AddComponent("wang_chess_box_owner")

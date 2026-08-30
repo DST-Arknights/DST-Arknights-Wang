@@ -5,9 +5,8 @@
 -- 拾取：inventoryitem canbepickedup(alive)，左键拾取进物品栏（右键打开由容器接管）
 -- 容器：4 格储物，infinitestacksize = 无普通堆叠上限（容器组件 SetIgnoreMaxSize）
 -- 宠物式存在（随主人上下线消失/重现，存档由主人管理）：
---   全程 persists=false → inv/世界档均不存（inv:OnSave 跳过 persists=false，
---                         读档不会重复触发进包事件），存档唯一来源是主人
---                         wang_chess_box_owner 组件（捕获 GetSaveRecord 含容器）
+--   绑定时 persists=false，由主人 wang_chess_box_owner 捕获完整记录；
+--   换绑后旧盒解除绑定并恢复 persists=true，作为普通地面实体保存。
 --   进出背包事件（SetOnPutInInventoryFn/SetOnDroppedFn）驱动主人组件 TrackBox 记录模式
 -- 交互（原版动作解析天然支持）：地面可拾取/打开，物品栏内可装备至头部
 -- 穿戴：实体自身通过 FollowSymbol 挂到头部，不覆盖玩家动画符号
@@ -174,7 +173,7 @@ end
 
 -- ────────────────────────────────────────────────────────
 -- 拾取进物品栏：关闭容器、清旧主人登记、登记新主人为背包态
--- brain 由 inventoryitem HibernateLivingItem 自动休眠；存档由主人组件管（全程 persists=false）
+-- brain 由 inventoryitem HibernateLivingItem 自动休眠；绑定后存档由主人组件管理
 -- ────────────────────────────────────────────────────────
 local function OnPutInInventory(inst, owner)
   inst.components.inventoryitem.canbepickedup = false
@@ -185,15 +184,23 @@ local function OnPutInInventory(inst, owner)
   -- 清旧主人（棋盒之前跟随者）的组件登记
   local oldleader = inst.components.follower ~= nil and inst.components.follower:GetLeader() or nil
   if oldleader ~= nil and oldleader:IsValid() and oldleader.components.wang_chess_box_owner ~= nil then
-    oldleader.components.wang_chess_box_owner:ClearBox()
+    oldleader.components.wang_chess_box_owner:ClearBox(inst)
   end
 
   -- 记录新主人并登记为背包态：_pendingleader 瞬态，_owner_userid 持久（跨会话兜底）
   local grand = (owner ~= nil and owner.components.inventoryitem ~= nil) and owner.components.inventoryitem:GetGrandOwner() or owner
   if grand ~= nil and grand:HasTag("player") then
+    inst.persists = false
     inst._pendingleader = grand
     inst._owner_userid = grand.userid
     grand.components.wang_chess_box_owner:TrackBox(inst, "inventory")
+  else
+    inst.persists = true
+    inst._pendingleader = nil
+    inst._owner_userid = nil
+    if inst.components.follower ~= nil then
+      inst.components.follower:SetLeader(nil)
+    end
   end
 end
 
@@ -206,14 +213,36 @@ local function OnDropped(inst)
   local leader = inst._pendingleader or inst.components.follower:GetLeader() or FindPlayerByUserid(inst._owner_userid)
   inst._pendingleader = nil
   if leader ~= nil and leader:IsValid() and inst.components.follower ~= nil then
+    inst.persists = false
     inst.components.follower:SetLeader(leader)
     inst._owner_userid = leader:HasTag("player") and leader.userid or nil
     if leader.components.wang_chess_box_owner ~= nil then
       leader.components.wang_chess_box_owner:TrackBox(inst, "following")
     end
+  else
+    inst.persists = true
   end
   if inst.sg ~= nil then
     inst.sg:GoToState("idle")
+  end
+end
+
+local function OnPickup(inst, pickupguy)
+  if pickupguy ~= nil and pickupguy:HasTag("player")
+      and pickupguy.components.wang_chess_box_owner ~= nil then
+    local replace_equipped = pickupguy.components.wang_chess_box_owner:PrepareForBoxPickup(inst)
+    if replace_equipped and pickupguy.components.inventory ~= nil then
+      return pickupguy.components.inventory:Equip(inst) == true
+    end
+  end
+end
+
+local function UnbindOwner(inst)
+  inst._pendingleader = nil
+  inst._owner_userid = nil
+  inst.persists = true
+  if inst.components.follower ~= nil then
+    inst.components.follower:SetLeader(nil)
   end
 end
 
@@ -262,8 +291,8 @@ local function fn()
     return inst
   end
 
-  -- 存档由主人 wang_chess_box_owner 组件全权管理（inv/世界档均不存，避免双重存档/读档重复触发）
-  inst.persists = false
+  -- 无主地面棋盒由世界保存；绑定后切为主人组件嵌入存档。
+  inst.persists = true
 
   inst:AddComponent("inspectable")
   inst.components.inspectable:RecordViews()
@@ -273,6 +302,7 @@ local function fn()
   inst.components.inventoryitem.canbepickedup = true
   inst.components.inventoryitem.canbepickedupalive = true
   inst.components.inventoryitem.nobounce = true
+  inst.components.inventoryitem:SetOnPickupFn(OnPickup)
   inst.components.inventoryitem:SetOnPutInInventoryFn(OnPutInInventory)
   inst.components.inventoryitem:SetOnDroppedFn(OnDropped)
 
@@ -322,6 +352,7 @@ local function fn()
   inst.components.container.canbeopened = true
   inst.components.container:EnableInfiniteStackSize(true) -- 只读属性，须用 setter（同步 replica + 现有物品 SetIgnoreMaxSize）
   inst:ListenForEvent("itemget", OnItemGet)
+  inst.UnbindOwner = UnbindOwner
 
   -- 主人 userid 存档：跨会话"放下棋盒→找回主人"兜底（随主人组件 GetSaveRecord 一并记录）
   inst.OnSave = function(_, data)

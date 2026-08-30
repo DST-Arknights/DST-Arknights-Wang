@@ -7,6 +7,7 @@
 -- 网格：落点格已被占/被占位 → 不显示动作（客户端）/ 不消耗不部署（服务端 fn 权威）
 -- ════════════════════════════════════════════════════════
 local Grid = require "wang_piecegrid"
+local PieceResource = require "wang_piece_resource"
 
 -- 落子 action：fn 从 act:GetActionPoint() 读取目标地面点，消耗黑子并部署棋子
 AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
@@ -16,14 +17,16 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
     return false
   end
   -- 无黑子则失败（不消耗，返回失败原因）
-  if doer.components.inventory == nil or not doer.components.inventory:Has("piece", 1) then
+  if not PieceResource.HasAny(doer) then
     return false, "NO_PIECES"
   end
   -- 网格检查：落点格已被占/被占位 → 不消耗不部署
   if Grid:IsCellTaken(pos.x, pos.z) then
     return false, "CELL_OCCUPIED"
   end
-  doer.components.inventory:ConsumeByName("piece", 1)
+  if not PieceResource.TryConsume(doer, 1) then
+    return false, "NO_PIECES"
+  end
   local piece = SpawnPrefab("piece")
   if piece ~= nil then
     local sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
@@ -39,7 +42,7 @@ ACTIONS.WANG_LUOZI.rmb = true
 AddComponentAction("POINT", "nianzi_sword", function(inst, doer, pos, actions, right, target)
   if right
       and doer ~= nil and not doer:HasTag("playerghost")
-      and doer.replica.inventory ~= nil and doer.replica.inventory:Has("piece", 1)
+      and PieceResource.HasAny(doer)
       and TheWorld.Map ~= nil and not TheWorld.Map:IsGroundTargetBlocked(pos)
       and not Grid:IsCellTakenForAction(pos.x, pos.z) then
     table.insert(actions, ACTIONS.WANG_LUOZI)

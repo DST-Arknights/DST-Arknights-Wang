@@ -2,6 +2,6 @@
 <Atlas>
 	<Texture filename="nianzi_sword.tex" />
 	<Elements>
-		<Element name="nianzi_sword.tex" u1="0.001" u2="0.999" v2="0.999" v1="0.001" variant="" />
+		<Element name="nianzi_sword.tex" u1="0.001" u2="0.9365" v2="0.999" v1="0.0635" variant="" />
 	</Elements>
 </Atlas>

@@ -2,6 +2,6 @@
 <Atlas>
 	<Texture filename="piece_box.tex" />
 	<Elements>
-		<Element name="piece_box.tex" u1="0.001" u2="0.577125" v2="0.999" v1="0.422875" variant="" />
+		<Element name="piece_box.tex" u1="0.001" u2="0.999" v2="0.999" v1="0.001" variant="" />
 	</Elements>
 </Atlas>

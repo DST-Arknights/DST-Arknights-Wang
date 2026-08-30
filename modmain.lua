@@ -160,6 +160,31 @@ end)
 -- containers 是游戏模块（非全局），需 require 后注册容器 UI 配置
 -- 4 格储物 UI（2×2）。暂用原版 ui_chest_2x2，等棋盒专属容器 UI 资源补齐后替换 animbank/animbuild
 local containers = require("containers")
+
+-- 原版 specialized container 只扫描主物品栏；补充扫描头部装备栏中的云兽。
+AddComponentPostInit("inventory", function(self)
+  local GetSpecializedContainers = self.GetSpecializedContainers
+  self.GetSpecializedContainers = function(inventory, ...)
+    local specialized = GetSpecializedContainers(inventory, ...)
+    if inventory.ignorespoverflow then
+      return specialized
+    end
+
+    local equipped = inventory:GetEquippedItem(EQUIPSLOTS.HEAD)
+    local container = equipped ~= nil and equipped.prefab == "piece_box"
+      and equipped.components.container or nil
+    if container ~= nil and container.priorityfn ~= nil
+        and container.canbeopened
+        and not (container.droponopen or container.inst:HasTag("portablecontainer")) then
+      specialized = specialized or {}
+      if not table.contains(specialized, container) then
+        table.insert(specialized, container)
+      end
+    end
+    return specialized
+  end
+end)
+
 containers.params["piece_box"] = {
   widget = {
     slotpos = {
@@ -174,6 +199,9 @@ containers.params["piece_box"] = {
     side_align_tip = 120,
   },
   type = "chest",
+  priorityfn = function(_, item)
+    return item ~= nil and item.prefab == "piece"
+  end,
 }
 
 -- 初始物品（兽形棋盒）：望出生自带，可拾取进背包 / 放下跟随

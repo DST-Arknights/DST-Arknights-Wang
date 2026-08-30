@@ -44,6 +44,16 @@ local states = {
     end,
   },
 
+  -- 装备时保留自身循环动画，busy/nosleep 阻止互动与睡眠事件切换状态。
+  State {
+    name = "equipped",
+    tags = { "busy", "nosleep" },
+    onenter = function(inst)
+      inst.Physics:Stop()
+      inst.AnimState:PlayAnimation("idle_loop", true)
+    end,
+  },
+
   State {
     name = "open",
     tags = { "busy", "open" },

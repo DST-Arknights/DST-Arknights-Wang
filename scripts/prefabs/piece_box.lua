@@ -17,6 +17,10 @@ RegisterInventoryItemAtlas("images/inventoryimages/piece_box.xml", "piece_box.te
 local brain = require "brains/piece_boxbrain"
 
 local WRONG_ITEM_COMMENT_CHANCE = 0.5
+local EQUIPPED_BRAIN_STOP_REASON = "piece_box_equipped"
+local HAT_FOLLOW_OFFSET_X = 0
+local HAT_FOLLOW_OFFSET_Y = -120
+local HAT_FOLLOW_OFFSET_Z = 0
 
 local assets = {
   Asset("ANIM", "anim/kitcoon_basic.zip"),
@@ -27,17 +31,23 @@ local assets = {
   Asset("ATLAS", "images/map_icons/piece_box.xml"),
 }
 
+local prefabs = {
+  "piece_box_hat_fx",
+}
+
 -- ────────────────────────────────────────────────────────
 -- 容器开关 → SG 播打开/关闭动画
 -- ────────────────────────────────────────────────────────
 local function OnOpen(inst)
-  if inst.sg ~= nil then
+  if inst.sg ~= nil
+      and (inst.components.equippable == nil or not inst.components.equippable:IsEquipped()) then
     inst.sg:GoToState("open")
   end
 end
 
 local function OnClose(inst)
-  if inst.sg ~= nil then
+  if inst.sg ~= nil
+      and (inst.components.equippable == nil or not inst.components.equippable:IsEquipped()) then
     inst.sg:GoToState("close")
   end
 end
@@ -54,28 +64,82 @@ local function OnItemGet(inst, data)
   end
 end
 
+local function ShowOwnerHatSymbols(owner)
+  owner.AnimState:ClearOverrideSymbol("headbase_hat")
+  owner.AnimState:Show("HAT")
+  owner.AnimState:Show("HAIR_HAT")
+  owner.AnimState:Hide("HAIR_NOHAT")
+  owner.AnimState:Hide("HAIR")
+
+  if owner.isplayer then
+    owner.AnimState:Hide("HEAD")
+    owner.AnimState:Show("HEAD_HAT")
+    owner.AnimState:Show("HEAD_HAT_NOHELM")
+    owner.AnimState:Hide("HEAD_HAT_HELM")
+  end
+end
+
+local function HideOwnerHatSymbols(owner)
+  owner.AnimState:ClearOverrideSymbol("headbase_hat")
+  owner.AnimState:ClearOverrideSymbol("swap_hat")
+  owner.AnimState:Hide("HAT")
+  owner.AnimState:Hide("HAIR_HAT")
+  owner.AnimState:Show("HAIR_NOHAT")
+  owner.AnimState:Show("HAIR")
+
+  if owner.isplayer then
+    owner.AnimState:Show("HEAD")
+    owner.AnimState:Hide("HEAD_HAT")
+    owner.AnimState:Hide("HEAD_HAT_NOHELM")
+    owner.AnimState:Hide("HEAD_HAT_HELM")
+  end
+end
+
+local function RemoveHatFx(inst)
+  if inst._hatfx ~= nil then
+    if inst._hatfx:IsValid() then
+      inst._hatfx:Remove()
+    end
+    inst._hatfx = nil
+  end
+end
+
+local function SpawnHatFx(inst, owner)
+  RemoveHatFx(inst)
+  local fx = SpawnPrefab("piece_box_hat_fx")
+  if fx ~= nil then
+    fx.entity:SetParent(owner.entity)
+    fx.Follower:FollowSymbol(owner.GUID, "headbase",
+      HAT_FOLLOW_OFFSET_X, HAT_FOLLOW_OFFSET_Y, HAT_FOLLOW_OFFSET_Z)
+    inst._hatfx = fx
+  end
+end
+
 local function OnEquip(inst, owner)
   if inst.components.container ~= nil then
     inst.components.container:Close(owner)
   end
   inst:ReturnToScene()
+  inst:Hide()
   inst.Physics:SetActive(false)
   inst.DynamicShadow:Enable(false)
-  inst.entity:SetParent(owner.entity)
-  inst.Follower:FollowSymbol(owner.GUID, "headbase", -20, -120, 0)
-  inst.AnimState:PlayAnimation("idle_loop", true)
+  inst.MiniMapEntity:SetEnabled(false)
+  SpawnHatFx(inst, owner)
+  ShowOwnerHatSymbols(owner)
+
+  inst:StopBrain(EQUIPPED_BRAIN_STOP_REASON)
+  if inst.sg ~= nil then
+    inst.sg:GoToState("equipped")
+  else
+    inst.AnimState:PlayAnimation("idle_loop", true)
+  end
 end
 
-local function OnUnequip(inst)
-  inst.Follower:StopFollowing()
-  inst.Physics:SetActive(true)
-  inst.DynamicShadow:Enable(true)
+local function OnUnequip(inst, owner)
+  HideOwnerHatSymbols(owner)
+  RemoveHatFx(inst)
   inst:RemoveFromScene()
-end
-
-local function OnEquipToModel(inst)
-  inst.Follower:StopFollowing()
-  inst:RemoveFromScene()
+  inst:RestartBrain(EQUIPPED_BRAIN_STOP_REASON)
 end
 
 local WAKE_TO_FOLLOW_DISTANCE = 14
@@ -164,7 +228,6 @@ local function fn()
   inst.entity:AddSoundEmitter()
   inst.entity:AddDynamicShadow()
   inst.entity:AddMiniMapEntity()
-  inst.entity:AddFollower()
   inst.entity:AddNetwork()
 
   MakeCharacterPhysics(inst, 1, 0.5)
@@ -217,7 +280,6 @@ local function fn()
   inst.components.equippable.equipslot = EQUIPSLOTS.HEAD
   inst.components.equippable:SetOnEquip(OnEquip)
   inst.components.equippable:SetOnUnequip(OnUnequip)
-  inst.components.equippable:SetOnEquipToModel(OnEquipToModel)
 
   inst:AddComponent("insulator")
   inst.components.insulator:SetInsulation(120)
@@ -273,10 +335,40 @@ local function fn()
     end
   end
 
+  inst.OnRemoveEntity = RemoveHatFx
+
   inst:SetStateGraph("SGpiece_box")
   inst:SetBrain(brain)
 
   return inst
 end
 
-return Prefab("piece_box", fn, assets)
+local function hatfxfn()
+  local inst = CreateEntity()
+
+  inst.entity:AddTransform()
+  inst.entity:AddAnimState()
+  inst.entity:AddFollower()
+  inst.entity:AddNetwork()
+
+  inst.Transform:SetSixFaced()
+  inst.AnimState:SetBuild("piece_box_build")
+  inst.AnimState:SetBank("kitcoon")
+  inst.AnimState:PlayAnimation("idle_loop", true)
+
+  inst:AddTag("FX")
+  inst:AddTag("NOCLICK")
+
+  inst.entity:SetPristine()
+
+  if not TheWorld.ismastersim then
+    return inst
+  end
+
+  inst.persists = false
+
+  return inst
+end
+
+return Prefab("piece_box", fn, assets, prefabs),
+  Prefab("piece_box_hat_fx", hatfxfn, assets)

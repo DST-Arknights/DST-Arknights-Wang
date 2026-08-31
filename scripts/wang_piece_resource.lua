@@ -1,21 +1,26 @@
 local WangPieceResource = {}
 
-function WangPieceResource.HasAny(doer)
+function WangPieceResource.Has(doer, amount)
   if doer == nil then
     return false
   end
+  amount = math.max(1, math.floor(amount or 1))
 
   local owner = doer.components ~= nil and doer.components.wang_chess_box_owner or nil
   if owner ~= nil then
-    return owner:HasPieces(1)
+    return owner:HasPieces(amount)
   end
 
   local inventory = doer.replica ~= nil and doer.replica.inventory or nil
-  if inventory ~= nil and inventory:Has("piece", 1) then
+  if inventory ~= nil and inventory:Has("piece", amount) then
     return true
   end
   local owner_replica = doer.replica ~= nil and doer.replica.wang_chess_box_owner or nil
-  return owner_replica ~= nil and owner_replica:BoxHasPiece()
+  return amount == 1 and owner_replica ~= nil and owner_replica:BoxHasPiece()
+end
+
+function WangPieceResource.HasAny(doer)
+  return WangPieceResource.Has(doer, 1)
 end
 
 function WangPieceResource.TryConsume(doer, amount)

@@ -148,9 +148,9 @@ end
 
 -- ════════════════════════════════════════════════════════
 -- 连星（技能2）：选区填充 + 棋子互连
--- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③格邻接互连
+-- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③邻格互连
 -- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
--- ③互连规则：只连与自己正交相邻格（上/下/左/右）里的棋子，形成格状连线；不跨格自由连
+-- ③互连规则：选区内新旧棋子都参与，只连接正交相邻网格，不跨格连接
 -- ════════════════════════════════════════════════════════
 local WANG_SKILL2_AOE_RANGE = 6     -- 选区半径（填充 / 连接范围，大于取势的 4）
 local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
@@ -168,13 +168,9 @@ RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
 -- 候选点 = 世界网格格中心 + 施法点偏移：吸附 OFF（默认）把施法点在其格内的偏移复制到各格，
 --          保持"瞄准哪就偏哪"的手感；吸附 ON → 全部落在格中心
 -- 跳过被占格（含投掷占位，与全局网格一致）与不可通行地面；包里棋子用尽即停
-local function DeployPiecesInArea(doer, cx, cz)
+local function FindDeployCandidates(cx, cz)
   local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
   local range = WANG_SKILL2_AOE_RANGE
-  local inv = doer.components.inventory
-  if inv == nil then
-    return
-  end
 
   -- 施法点在其所在格内的偏移（吸附 OFF 时复制到每个填充格；ON 时 offset = 0）
   local offX, offZ = 0, 0
@@ -198,9 +194,12 @@ local function DeployPiecesInArea(doer, cx, cz)
     end
   end
   table.sort(candidates, function(a, b) return a[3] < b[3] end)
+  return candidates
+end
 
+local function DeployPiecesInArea(doer, cx, cz)
   -- 部署：每消耗一枚包里棋子 → 生成一个新棋子到该格点
-  for _, c in ipairs(candidates) do
+  for _, c in ipairs(FindDeployCandidates(cx, cz)) do
     if not PieceResource.TryConsume(doer, 1) then
       break -- 包里棋子用尽
     end
@@ -211,34 +210,68 @@ local function DeployPiecesInArea(doer, cx, cz)
   end
 end
 
--- ③ 互连：每棋子只连到与自己正交相邻网格（上/下/左/右）里的棋子，最多 max_links 条
--- 由"就近自由连"改为"网格邻接连"：候选仅取相邻格棋子，形成整齐格状连线（更美观）
+local function CanAcceptLink(piece)
+  if piece == nil or not piece:IsValid() or piece.components.electricconnector == nil then
+    return false
+  end
+  local connector = piece.components.electricconnector
+  return GetTableSize(connector.fields) < (connector.max_links or TUNING.WANG.PIECE_MAX_LINKS or 4)
+end
+
+local function AreGridNeighbors(ax, az, bx, bz)
+  local agx, agz = Grid:CellCoord(ax, az)
+  local bgx, bgz = Grid:CellCoord(bx, bz)
+  local dx = math.abs(agx - bgx)
+  local dz = math.abs(agz - bgz)
+  return (dx == 1 and dz == 0) or (dx == 0 and dz == 1)
+end
+
+local function CanLinkPieces(p, q)
+  if p == q or not CanAcceptLink(p) or not CanAcceptLink(q)
+      or p.components.electricconnector.fields[q] ~= nil then
+    return false
+  end
+  local px, _, pz = p.Transform:GetWorldPosition()
+  local qx, _, qz = q.Transform:GetWorldPosition()
+  return AreGridNeighbors(px, pz, qx, qz)
+end
+
+local function HasConnectablePair(pieces)
+  for i = 1, #pieces - 1 do
+    for j = i + 1, #pieces do
+      if CanLinkPieces(pieces[i], pieces[j]) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- ③ 互连：选区内新旧棋子都参与，只补齐正交相邻网格间的连线
 -- 复用 electricconnector:ConnectTo —— 双向注册自动去重（fields 表）；满 max_links 打 fully_electrically_linked
 local function LinkPiecesInArea(pieces)
-  local maxLinks = TUNING.WANG.PIECE_MAX_LINKS or 4
   for i = 1, #pieces do
     local p = pieces[i]
-    if p:IsValid() and p.components.electricconnector ~= nil then
+    if CanAcceptLink(p) then
       local pc = p.components.electricconnector
       local px, _, pz = p.Transform:GetWorldPosition()
-      local gx, gz = Grid:CellCoord(px, pz)
 
-      -- 候选：与自己正交相邻格里的棋子（未连接过 / 对方未满连接数）
+      local candidates = {}
       for j = 1, #pieces do
-        if j ~= i and GetTableSize(pc.fields) < maxLinks then
-          local q = pieces[j]
-          if q:IsValid() and q.components.electricconnector ~= nil then
-            local qc = q.components.electricconnector
-            if pc.fields[q] == nil and GetTableSize(qc.fields) < maxLinks then
-              local qx, _, qz = q.Transform:GetWorldPosition()
-              local qgx, qgz = Grid:CellCoord(qx, qz)
-              local dx = math.abs(gx - qgx)
-              local dz = math.abs(gz - qgz)
-              if (dx == 1 and dz == 0) or (dx == 0 and dz == 1) then
-                pc:ConnectTo(q)
-              end
-            end
-          end
+        local q = pieces[j]
+        if CanLinkPieces(p, q) then
+          local qx, _, qz = q.Transform:GetWorldPosition()
+          table.insert(candidates, { q, (qx - px) * (qx - px) + (qz - pz) * (qz - pz) })
+        end
+      end
+      table.sort(candidates, function(a, b) return a[2] < b[2] end)
+
+      for _, candidate in ipairs(candidates) do
+        if not CanAcceptLink(p) then
+          break
+        end
+        if CanLinkPieces(p, candidate[1]) then
+          pc:ConnectTo(candidate[1])
         end
       end
     end
@@ -306,16 +339,47 @@ AddStategraphState("wilson_client", wangLianxingState)
 AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 
--- 技能2激活测试（连星）：选区有已部署棋子（可直接连接）或包里还有棋子（可填充）才合法
--- 返回 false → 不消耗技能充能
+local function CanCandidateLink(candidate, pieces, earlierCandidates)
+  for _, piece in ipairs(pieces) do
+    if CanAcceptLink(piece) then
+      local px, _, pz = piece.Transform:GetWorldPosition()
+      if AreGridNeighbors(candidate[1], candidate[2], px, pz) then
+        return true
+      end
+    end
+  end
+  for _, earlier in ipairs(earlierCandidates) do
+    if AreGridNeighbors(candidate[1], candidate[2], earlier[1], earlier[2]) then
+      return true
+    end
+  end
+  return false
+end
+
+-- 技能2激活测试（连星）：必须能让选区新增至少一条邻格连线。
+-- 先检查旧子之间能否补链；需要落子时，按实际部署顺序和库存数量模拟新旧/新新连线。
 local function OnWangSkill2ActivateTest(skill, params)
   if params == nil or params.targetPos == nil then
-    return false
+    return false, 'WANG_SKILL2_NO_LINK'
   end
   local x, y, z = params.targetPos:Get()
-  local hasAreaPieces = #TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil) > 0
-  local hasInvPieces = PieceResource.HasAny(skill.inst)
-  return hasAreaPieces or hasInvPieces
+  local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
+  if HasConnectablePair(pieces) then
+    return true
+  end
+
+  local candidates = FindDeployCandidates(x, z)
+  local earlierCandidates = {}
+  for index, candidate in ipairs(candidates) do
+    if not PieceResource.Has(skill.inst, index) then
+      break
+    end
+    if CanCandidateLink(candidate, pieces, earlierCandidates) then
+      return true
+    end
+    table.insert(earlierCandidates, candidate)
+  end
+  return false, 'WANG_SKILL2_NO_LINK'
 end
 
 -- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 执行填充+连接
@@ -323,7 +387,7 @@ end
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
-    return false
+    return false, 'WANG_SKILL2_NO_LINK'
   end
   local pos = data.targetPos
 

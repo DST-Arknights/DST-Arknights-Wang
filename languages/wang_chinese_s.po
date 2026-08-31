@@ -175,6 +175,11 @@ msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES"
 msgid "No deployed stones in range"
 msgstr "此间无子可引……"
 
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK"
+msgid "No stones can form a link here"
+msgstr "此间无子可围……"
+
 #. STRINGS.NAMES.NIANZI_SWORD
 msgctxt "STRINGS.NAMES.NIANZI_SWORD"
 msgid "Nianzi Sword"

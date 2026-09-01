@@ -4,10 +4,9 @@
 -- 跟随：参考切斯特（brain 跟随 follower.leader），leader = 放下它的建造者/持有者
 -- 拾取：inventoryitem canbepickedup(alive)，左键拾取进物品栏（右键打开由容器接管）
 -- 容器：4 格储物，infinitestacksize = 无普通堆叠上限（容器组件 SetIgnoreMaxSize）
--- 宠物式存在（随主人上下线消失/重现，存档由主人管理）：
---   绑定时 persists=false，由主人 wang_chess_box_owner 捕获完整记录；
---   换绑后旧盒解除绑定并恢复 persists=true，作为普通地面实体保存。
---   进出背包事件（SetOnPutInInventoryFn/SetOnDroppedFn）驱动主人组件 TrackBox 记录模式
+-- 存档：地面跟随态 persists=false，由主人 wang_chess_box_owner 捕获记录；
+--   背包/装备态 persists=true，由原版 inventory 保存；解除关系后同样恢复普通持久化。
+--   startfollowing/stopfollowing 事件统一处理跟随绑定和持久化模式，进出背包事件只处理物品栏登记。
 -- 交互（原版动作解析天然支持）：地面可拾取/打开，物品栏内可装备至头部
 -- 穿戴：实体自身通过 FollowSymbol 挂到头部，不覆盖玩家动画符号
 -- ════════════════════════════════════════════════════════
@@ -171,79 +170,76 @@ local function FindPlayerByUserid(userid)
   return nil
 end
 
+local function OnStartFollowing(inst, data)
+  local leader = data ~= nil and data.leader or inst.components.follower:GetLeader()
+  if leader ~= nil and leader:HasTag("player") then
+    inst._owner_userid = leader.userid
+    leader.components.wang_chess_box_owner:TrackBox(inst, "following")
+  end
+end
+
+local function OnStopFollowing(inst, data)
+  local leader = data ~= nil and data.leader or inst.components.follower:GetLeader()
+  if leader ~= nil and leader:HasTag("player") then
+    leader.components.wang_chess_box_owner:ClearBox(inst)
+  end
+  inst._owner_userid = nil
+  inst.persists = true
+end
+
 -- ────────────────────────────────────────────────────────
--- 拾取进物品栏：关闭容器、清旧主人登记、登记新主人为背包态
--- brain 由 inventoryitem HibernateLivingItem 自动休眠；绑定后存档由主人组件管理
+-- 拾取进物品栏：关闭容器、解除跟随、登记新主人为背包态
+-- brain 由 inventoryitem HibernateLivingItem 自动休眠；存档由原版 inventory 管理
 -- ────────────────────────────────────────────────────────
 local function OnPutInInventory(inst, owner)
   inst.components.inventoryitem.canbepickedup = false
-  if inst.components.container ~= nil then
-    inst.components.container:Close()
+  inst.components.container:Close()
+
+  -- 解除地面跟随关系；stopfollowing 回调负责清理旧主人并恢复持久化。
+  if inst.components.follower:GetLeader() ~= nil then
+    inst.components.follower:SetLeader(nil)
   end
 
-  -- 清旧主人（棋盒之前跟随者）的组件登记
-  local oldleader = inst.components.follower ~= nil and inst.components.follower:GetLeader() or nil
-  if oldleader ~= nil and oldleader:IsValid() and oldleader.components.wang_chess_box_owner ~= nil then
-    oldleader.components.wang_chess_box_owner:ClearBox(inst)
-  end
-
-  -- 记录新主人并登记为背包态：_pendingleader 瞬态，_owner_userid 持久（跨会话兜底）
-  local grand = (owner ~= nil and owner.components.inventoryitem ~= nil) and owner.components.inventoryitem:GetGrandOwner() or owner
+  -- 背包/装备态由原版 inventory 保存，主人组件只保留运行时引用。
+  local grand = owner.components.inventoryitem ~= nil and owner.components.inventoryitem:GetGrandOwner() or owner
   if grand ~= nil and grand:HasTag("player") then
-    inst.persists = false
-    inst._pendingleader = grand
     inst._owner_userid = grand.userid
     grand.components.wang_chess_box_owner:TrackBox(inst, "inventory")
   else
     inst.persists = true
-    inst._pendingleader = nil
     inst._owner_userid = nil
-    if inst.components.follower ~= nil then
-      inst.components.follower:SetLeader(nil)
-    end
   end
 end
 
 -- ────────────────────────────────────────────────────────
 -- 放下：跟随主人并登记到其组件为跟随态（存档由主人组件管理）
--- 主人来源：本次拾取记录 → 现有 follower leader → _owner_userid（跨会话找回）
+-- 主人来源：现有 follower leader → _owner_userid（跨会话找回）
 -- ────────────────────────────────────────────────────────
 local function OnDropped(inst)
   inst.components.inventoryitem.canbepickedup = true
-  local leader = inst._pendingleader or inst.components.follower:GetLeader() or FindPlayerByUserid(inst._owner_userid)
-  inst._pendingleader = nil
-  if leader ~= nil and leader:IsValid() and inst.components.follower ~= nil then
-    inst.persists = false
+  local leader = inst.components.follower:GetLeader() or FindPlayerByUserid(inst._owner_userid)
+  if leader ~= nil and leader:IsValid() then
     inst.components.follower:SetLeader(leader)
-    inst._owner_userid = leader:HasTag("player") and leader.userid or nil
-    if leader.components.wang_chess_box_owner ~= nil then
-      leader.components.wang_chess_box_owner:TrackBox(inst, "following")
-    end
   else
+    inst._owner_userid = nil
     inst.persists = true
   end
-  if inst.sg ~= nil then
-    inst.sg:GoToState("idle")
-  end
+  inst.sg:GoToState("idle")
 end
 
 local function OnPickup(inst, pickupguy)
-  if pickupguy ~= nil and pickupguy:HasTag("player")
-      and pickupguy.components.wang_chess_box_owner ~= nil then
+  if pickupguy ~= nil and pickupguy:HasTag("player") then
     local replace_equipped = pickupguy.components.wang_chess_box_owner:PrepareForBoxPickup(inst)
-    if replace_equipped and pickupguy.components.inventory ~= nil then
+    if replace_equipped then
       return pickupguy.components.inventory:Equip(inst) == true
     end
   end
 end
 
 local function UnbindOwner(inst)
-  inst._pendingleader = nil
   inst._owner_userid = nil
   inst.persists = true
-  if inst.components.follower ~= nil then
-    inst.components.follower:SetLeader(nil)
-  end
+  inst.components.follower:SetLeader(nil)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -301,6 +297,8 @@ local function fn()
   inst:AddComponent("inventoryitem")
   inst.components.inventoryitem.canbepickedup = true
   inst.components.inventoryitem.canbepickedupalive = true
+  -- 仅限玩家物品栏，禁止放入其它容器，避免容器嵌套。
+  inst.components.inventoryitem.canonlygoinpocket = true
   inst.components.inventoryitem.nobounce = true
   inst.components.inventoryitem:SetOnPickupFn(OnPickup)
   inst.components.inventoryitem:SetOnPutInInventoryFn(OnPutInInventory)
@@ -331,6 +329,8 @@ local function fn()
   inst:AddComponent("follower")
   inst.components.follower.neverexpire = true
   inst.components.follower.keepleaderduringminigame = true
+  inst:ListenForEvent("startfollowing", OnStartFollowing)
+  inst:ListenForEvent("stopfollowing", OnStopFollowing)
 
   -- Chester/kitcoon 的船只上下船链路。无 health 组件本身即不会受伤或死亡。
   inst:AddComponent("embarker")
@@ -354,7 +354,7 @@ local function fn()
   inst:ListenForEvent("itemget", OnItemGet)
   inst.UnbindOwner = UnbindOwner
 
-  -- 主人 userid 存档：跨会话"放下棋盒→找回主人"兜底（随主人组件 GetSaveRecord 一并记录）
+  -- 主人 userid 存档：放下棋盒时找回当前在线主人。
   inst.OnSave = function(_, data)
     if inst._owner_userid ~= nil then
       data.owner_userid = inst._owner_userid

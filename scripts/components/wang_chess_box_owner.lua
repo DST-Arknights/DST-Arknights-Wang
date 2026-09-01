@@ -1,15 +1,16 @@
 -- ════════════════════════════════════════════════════════
 -- 棋盒主人组件（挂在玩家上，主世界专用）
--- 每名玩家只能绑定一个棋盒；绑定中的棋盒由本组件嵌入主人存档。
--- 被换下的棋盒解除绑定并恢复世界持久化，留在地面等待其他玩家拾取。
+-- 每名玩家只能绑定一个棋盒；地面跟随态由本组件嵌入主人存档。
+-- 背包/装备态由原版 inventory 保存；解除关系后棋盒恢复世界持久化。
 
 local PIECE_PREFAB = "piece"
 
+local function DoSpawnEffects(box)
+  SpawnPrefab("spawn_fx_small").Transform:SetPosition(box.Transform:GetWorldPosition())
+end
+
 local function SetReplicaHasPiece(self, haspiece)
-  local replica = self.inst.replica ~= nil and self.inst.replica.wang_chess_box_owner or nil
-  if replica ~= nil then
-    replica:SetBoxHasPiece(haspiece)
-  end
+  self.inst.replica.wang_chess_box_owner:SetBoxHasPiece(haspiece)
 end
 
 local function DetachBoxListeners(self, box)
@@ -28,14 +29,12 @@ end
 
 local function OnPlayerDespawned(self)
   local box = self._box
-  if box ~= nil and box:IsValid() then
-    if box.components.container ~= nil then
-      box.components.container:Close()
-    end
+  if box ~= nil and box:IsValid() and self._box_mode == "following" then
+    box.components.container:Close()
+    box.temp_save_platform_pos = true
     self._box_record = box:GetSaveRecord()
+    box.temp_save_platform_pos = nil
     DetachBoxListeners(self, box)
-    self._box = nil
-    SetReplicaHasPiece(self, false)
     box:Remove()
   end
   self._box = nil
@@ -189,9 +188,7 @@ function WangChessBoxOwner:PrepareForBoxPickup(box)
 end
 
 function WangChessBoxOwner:TrackBox(box, mode)
-  if box == nil or not box:IsValid() then
-    return
-  end
+  assert(mode == "inventory" or mode == "following")
   if self._box ~= nil and self._box ~= box then
     self:_DropBoundBox()
   end
@@ -202,7 +199,7 @@ function WangChessBoxOwner:TrackBox(box, mode)
   end
   self._box_mode = mode
   self._box_record = nil
-  box.persists = false
+  box.persists = mode ~= "following"
   self:RefreshBoxHasPiece()
 end
 
@@ -218,62 +215,53 @@ function WangChessBoxOwner:ClearBox(box)
   SetReplicaHasPiece(self, false)
 end
 
--- 主人上线：从记录重生棋盒，按模式放回背包或放身边跟随
+-- 主人上线：从主人记录重生地面跟随态棋盒
 function WangChessBoxOwner:SpawnBox()
   if self._box_record == nil then
     return
   end
   local record = self._box_record
-  local mode = self._box_mode
   self._box_record = nil
   self._box_mode = nil
 
   local box = SpawnSaveRecord(record)
-  if box ~= nil then
-    self:TrackBox(box, mode)
-
-    -- 背包态：GiveItem 回主人背包（触发 OnPutInInventory，会 TrackBox + 关闭容器）
-    if mode == "inventory" and self.inst.components.inventory ~= nil
-        and self.inst.components.inventory:GiveItem(box) then
-      return
-    end
-
-    -- 跟随态（或进背包失败兜底）：放身边跟随
-    if box.components.inventoryitem ~= nil then
-      box.components.inventoryitem.canbepickedup = true
-    end
-    local x, y, z = self.inst.Transform:GetWorldPosition()
-    box.Transform:SetPosition(x, y, z)
-    if box.components.follower ~= nil then
-      box.components.follower:SetLeader(self.inst)
-    end
-    self:TrackBox(box, "following")
-    if box.sg ~= nil then
-      box.sg:GoToState("idle")
-    end
-  end
+  -- 地面跟随态：放身边并通过 startfollowing 回调重新绑定。
+  box.components.inventoryitem.canbepickedup = true
+  local x, y, z = self.inst.Transform:GetWorldPosition()
+  box.Transform:SetPosition(x, y, z)
+  box.components.follower:SetLeader(self.inst)
+  box.sg:GoToState("idle")
+  -- 与原版宠物上线保持一致，延迟一帧播放出现特效。
+  box:DoTaskInTime(0, DoSpawnEffects)
+  return box
 end
 
 function WangChessBoxOwner:OnSave()
-  -- 直接捕获当前棋盒记录（无论背包/跟随态）
-  if self._box ~= nil and self._box:IsValid() then
+  -- 仅捕获地面跟随态；背包/装备态由原版 inventory 保存。
+  if self._box ~= nil and self._box:IsValid() and self._box_mode == "following" then
+    self._box.temp_save_platform_pos = true
     self._box_record = self._box:GetSaveRecord()
+    self._box.temp_save_platform_pos = nil
   end
   if self._box_record ~= nil then
-    return { box_record = self._box_record, box_mode = self._box_mode }
+    return { box_record = self._box_record }
   end
 end
 
 function WangChessBoxOwner:OnLoad(data)
   if data ~= nil and data.box_record ~= nil then
     self._box_record = data.box_record
-    self._box_mode = data.box_mode
-    -- 延迟一帧重生，确保玩家与背包已就位（inv 读档不会触发进包事件，无重复）
-    self.inst:DoTaskInTime(0, function()
-      if self.inst:IsValid() then
-        self:SpawnBox()
-      end
-    end)
+    if self.inst.migration ~= nil then
+      -- 与 petleash.OnLoad 一致：先重生并登记，playerspawner 随后统一传送。
+      table.insert(self.inst.migrationpets, self:SpawnBox())
+    else
+      -- 普通读档延迟一帧，确保玩家实体已完成定位。
+      self.inst:DoTaskInTime(0, function()
+        if self.inst:IsValid() then
+          self:SpawnBox()
+        end
+      end)
+    end
   end
 end
 

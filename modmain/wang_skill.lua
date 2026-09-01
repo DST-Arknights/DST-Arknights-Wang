@@ -163,6 +163,23 @@ RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
   pingprefab     = "reticuleaoeping_6",
 })
 
+-- 天下劫地图选择：选择一个已部署棋子，而不是选择棋子附近的任意位置。
+-- MapTargetSelector 在客户端命中全局地图代理，在服务端解析回真实 piece 实体。
+RegisterTargetSelector("wang_skill3_map", MapTargetSelector {
+  actionstring = STRINGS.UI.ARK_SKILL.NAMES.WANG[3],
+  targetprefab = "piece",
+  targettags = { "wang_piece_deployed" },
+  targetrange = 5,
+  mapiconprefab = "globalmapiconunderfog",
+  mapicontag = "wang_piece_map_marker",
+  -- 地图打开后给候选棋子添加原版风格的焦点装饰；全部字段均为可选配置。
+  mapfocus = {
+    bank = "courier_minimap_indicator",
+    build = "courier_minimap_indicator",
+    scale = 0.2
+  },
+})
+
 -- ① 选区网格填充：从包里消耗棋子，按世界网格空闲格部署（近→远）
 --    批量部署也播 ChuXian 出现动画（与拈子剑一致），随后转 WeiJiHuo 待机
 -- 候选点 = 世界网格格中心 + 施法点偏移：吸附 OFF（默认）把施法点在其格内的偏移复制到各格，
@@ -402,6 +419,22 @@ local function OnWangSkill2Activate(skill, data)
   return true
 end
 
+-- 天下劫第一阶段：地图确认后只完成标准技能激活，后续效果另行接入。
+local function OnWangSkill3ActivateTest(skill, params)
+  local target = params ~= nil and params.target or nil
+  return target ~= nil and target:IsValid()
+    and target.prefab == "piece" and target:HasTag("wang_piece_deployed")
+end
+
+local function OnWangSkill3Activate(skill, data)
+  if data == nil or data.target == nil or not data.target:IsValid() then
+    return
+  end
+  local x, _, z = data.target.Transform:GetWorldPosition()
+  ArkLogger:Debug(string.format("天下劫：选择棋子[%s] 位置(%.1f,%.1f)",
+    tostring(data.target.GUID), x, z))
+end
+
 local skillConfig = {
   {
     id = 'wang_skill1', -- 取势
@@ -472,8 +505,12 @@ local skillConfig = {
     hotkey = KEY_C,
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO,
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,
+    targetSelector = "wang_skill3_map",
+    ActivateTest = OnWangSkill3ActivateTest,
+    OnActivate = OnWangSkill3Activate,
     levels = { {
-      activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
+      -- activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
+      activationEnergy = 10,
       maxActivationStacks = 1,
       params = {},
     } },

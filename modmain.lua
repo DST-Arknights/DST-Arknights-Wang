@@ -27,6 +27,7 @@ Assets = {
 AddMinimapAtlas('images/map_icons/wang.xml')
 AddMinimapAtlas('images/map_icons/nianzi_sword.xml')
 AddMinimapAtlas('images/map_icons/piece_box.xml')
+AddMinimapAtlas('images/map_icons/piece.xml')
 AddModCharacter("wang", "MALE")
 
 ArkLogger:DeclareLogger('INFO', 'wang')
@@ -217,6 +218,18 @@ end
 AddComponentPostInit("inventory", function(self)
   ArkHookFunction(self, "GetSpecializedContainers", IncludeEquippedPieceBox)
   ArkHookFunction(self, "GiveItem", GivePieceToBoxSilently)
+end)
+
+-- 可装备容器会同时生成右键 PICKUP 和 RUMMAGE，前者优先级更高并遮蔽“打开”。
+-- 仅过滤地面云兽的右键拾取；左键拾取、物品栏装备和原版容器动作保持不变。
+AddComponentAction("SCENE", "inventoryitem", function(inst, doer, actions, right)
+  if right and inst.prefab == "piece_box" then
+    for i = #actions, 1, -1 do
+      if actions[i] == ACTIONS.PICKUP then
+        table.remove(actions, i)
+      end
+    end
+  end
 end)
 
 containers.params["piece_box"] = {

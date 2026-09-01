@@ -370,6 +370,12 @@ local function fn()
 
   inst:SetStateGraph("SGpiece_box")
   inst:SetBrain(brain)
+  inst.OnEntityWake = function()
+    ArkLogger:Debug("piece_box OnEntityWake")
+  end
+  inst.OnEntitySleep = function()
+    ArkLogger:Debug("piece_box OnEntitySleep")
+  end
 
   return inst
 end

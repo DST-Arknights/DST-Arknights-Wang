@@ -48,9 +48,12 @@ local assets = {
   Asset("ANIM", "anim/piece.zip"),
   Asset("ANIM", "anim/swap_piece.zip"),
   Asset("ATLAS", "images/inventoryimages/piece.xml"),
+  Asset("ATLAS", "images/map_icons/piece.xml"),
 }
 
-local prefabs = {}
+local prefabs = {
+  "globalmapiconunderfog",
+}
 
 -- ────────────────────────────────────────────────────────
 -- 爆炸相关（参考游戏源码 explosive 组件 + 凯尔希二技能子弹）
@@ -150,6 +153,18 @@ local function DisableEntityCollisions(inst)
   end
 end
 
+local function CreateDeployedMapIcon(inst)
+  if inst._mapicon ~= nil and inst._mapicon:IsValid() then
+    return
+  end
+  local icon = SpawnPrefab("globalmapiconunderfog")
+  if icon ~= nil then
+    icon:AddTag("wang_piece_map_marker")
+    icon:TrackEntity(inst, nil, "piece.tex")
+    inst._mapicon = icon
+  end
+end
+
 -- ────────────────────────────────────────────────────────
 -- 部署态：投掷落地 / 技能放置后转地面建筑
 -- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
@@ -192,6 +207,7 @@ local function SetDeployedState(inst, deploydata)
     if not Grid:TryOccupy(x, z, inst) then
       ArkLogger:Debug("棋子部署但所在格已被占用（异常路径）")
     end
+    CreateDeployedMapIcon(inst)
   end
 end
 

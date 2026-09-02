@@ -71,9 +71,9 @@ end
 -- 主动爆炸额外摧毁周围建造物（参考凯尔希二技能子弹命中：collapse_small + workable:Destroy）
 -- 不含已部署棋子，避免连锁引爆
 local DESTROY_TAGS = { "CHOP_workable", "MINE_workable", "HAMMER_workable", "DIG_workable" }
-local function DestroySurroundingBuildings(inst, source)
+local function DestroySurroundingBuildings(inst, source, range)
   local x, y, z = inst.Transform:GetWorldPosition()
-  local ents = TheSim:FindEntities(x, y, z, EXPLODE_RANGE, nil,
+  local ents = TheSim:FindEntities(x, y, z, range, nil,
     { "insect", "INLIMBO", "wang_piece_deployed" }, DESTROY_TAGS)
   for _, ent in ipairs(ents) do
     if ent.components.workable ~= nil and ent.components.workable:CanBeWorked() then
@@ -88,13 +88,13 @@ end
 -- 范围伤害（参考火药爆炸 explosive 组件：范围内所有可攻击目标）
 --   source  伤害来源（主动=施法者记击杀；被动=棋子自身不记名）
 --   suggest 被动时吸引仇恨的对象（摧毁者）
-local function AoEExplode(inst, source, damage, active, suggest)
+local function AoEExplode(inst, source, damage, range, active, suggest)
   if active then
-    DestroySurroundingBuildings(inst, source)
+    DestroySurroundingBuildings(inst, source, range)
   end
 
   local x, y, z = inst.Transform:GetWorldPosition()
-  local ents = TheSim:FindEntities(x, y, z, EXPLODE_RANGE, nil, { "INLIMBO", "notarget" })
+  local ents = TheSim:FindEntities(x, y, z, range, nil, { "INLIMBO", "notarget" })
   for _, ent in ipairs(ents) do
     if ent ~= inst and not ent:IsInLimbo() and ent:IsValid()
         and not (ent.components.health ~= nil and ent.components.health:IsDead())
@@ -126,7 +126,7 @@ end
 -- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸本身对所有可攻击目标造成伤害，不摧毁建造物
 -- ────────────────────────────────────────────────────────
 local function PassiveDetonateCheck(inst)
-  local target = FindEntity(inst, EXPLODE_RANGE, function(dude)
+  local target = FindEntity(inst, EXPLODE_RANGE * inst._explodeRangeMultiplier, function(dude)
     return not (dude.components.health ~= nil and dude.components.health:IsDead())
       and dude.components.combat ~= nil and dude.components.combat:CanBeAttacked(inst)
   end, PROX_MUST_TAGS, PROX_NO_TAGS, PROX_ONEOF_TAGS)
@@ -392,8 +392,18 @@ local function fn()
     if inst._islinked then
       data.islinked = true
     end
+    if inst._damageMultiplier ~= 1 then
+      data.damageMultiplier = inst._damageMultiplier
+    end
+    if inst._explodeRangeMultiplier ~= 1 then
+      data.explodeRangeMultiplier = inst._explodeRangeMultiplier
+    end
   end
   inst.OnLoad = function(inst, data)
+    if data ~= nil then
+      inst._damageMultiplier = data.damageMultiplier or 1
+      inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
+    end
     if data ~= nil and data.isdeployed then
       SetDeployedState(inst)
     end
@@ -411,13 +421,16 @@ local function fn()
 
   -- 棋子基础伤害（内置，便于不同品质/类型扩展）
   inst._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+  inst._damageMultiplier = 1
+  inst._explodeRangeMultiplier = 1
 
   -- 主动引爆（1技能取势调用）：范围伤害 + 摧毁周围建造物 + 双特效
   -- multiplier: 技能倍率（如 0.9 / 1.1 / 1.3），实际伤害 = 基础伤害 × 倍率
   inst.ActiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end
-    local damage = inst._baseDamage * (multiplier or 1)
-    AoEExplode(inst, source, damage, true)
+    local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
+    local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
+    AoEExplode(inst, source, damage, range, true)
     SpawnExplodeFx(inst, true)
     inst:Remove()
   end
@@ -426,8 +439,9 @@ local function fn()
   -- multiplier: 倍率，默认 1（被动引爆无技能加成）
   inst.PassiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end
-    local damage = inst._baseDamage * (multiplier or 1)
-    AoEExplode(inst, inst, damage, false, source)
+    local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
+    local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
+    AoEExplode(inst, inst, damage, range, false, source)
     SpawnExplodeFx(inst, false)
     inst:Remove()
   end
@@ -465,6 +479,9 @@ local function fn()
   -- 仅主世界可调用
   inst.DeployPiece = function(_, pos, deploydata)
     if inst._isdeployed then return end
+    deploydata = deploydata or {}
+    inst._damageMultiplier = deploydata.damageMultiplier or 1
+    inst._explodeRangeMultiplier = deploydata.explodeRangeMultiplier or 1
     inst.Transform:SetPosition(pos.x, pos.y, pos.z)
     SetDeployedState(inst, deploydata)
   end

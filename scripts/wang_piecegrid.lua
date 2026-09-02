@@ -67,7 +67,18 @@ end
 -- 部署占用：格子空闲才成功（调用方已查 IsCellTaken，此处兜底）
 function Grid:TryOccupy(x, z, piece)
   local key = CellKey(CellCoord(x, z))
-  if self.cells[key] ~= nil then
+  local current = self.cells[key]
+  if current ~= nil and current.reservation == piece then
+    if current.task ~= nil then
+      current.task:Cancel()
+      current.task = nil
+    end
+    current.reservation = nil
+    current.piece = piece
+    piece._wang_gridKey = key
+    return true
+  end
+  if current ~= nil then
     return false
   end
   self.cells[key] = { piece = piece }

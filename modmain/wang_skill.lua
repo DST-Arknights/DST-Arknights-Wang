@@ -7,6 +7,45 @@ local ARK_CONSTANTS = require("ark_constants")
 local Grid = require("wang_piecegrid")
 local PieceResource = require("wang_piece_resource")
 
+local function UpdateSkill3Camera(inst)
+  if TheWorld.ismastersim or inst ~= ThePlayer or TheCamera == nil then
+    return
+  end
+  if inst._wang_skill3_active:value() then
+    if inst._wang_skill3_camera_state == nil then
+      local minpitch, maxpitch = TheCamera:GetPitchRange()
+      inst._wang_skill3_camera_state = {
+        distance = TheCamera:GetDistance(),
+        minpitch = minpitch,
+        maxpitch = maxpitch,
+        dollyzoom = TheCamera.dollyzoom,
+      }
+    end
+    TheCamera:SetDistance(40)
+    TheCamera:SetPitchRange(20, 70)
+    TheCamera.dollyzoom = true
+    if inst.HUD ~= nil and inst.HUD.clouds ~= nil then
+      inst.HUD.clouds:Hide()
+      inst.HUD.clouds_on = false
+    end
+  elseif inst._wang_skill3_camera_state ~= nil then
+    local state = inst._wang_skill3_camera_state
+    TheCamera:SetDistance(state.distance)
+    TheCamera:SetPitchRange(state.minpitch, state.maxpitch)
+    TheCamera.dollyzoom = state.dollyzoom
+    TheCamera:Snap()
+    if inst.HUD ~= nil then
+      inst.HUD:UpdateClouds(TheCamera)
+    end
+    inst._wang_skill3_camera_state = nil
+  end
+end
+
+AddPlayerPostInit(function(inst)
+  inst._wang_skill3_active = net_bool(inst.GUID, "wang_skill3_active", "wang_skill3_active_dirty")
+  inst:ListenForEvent("wang_skill3_active_dirty", UpdateSkill3Camera)
+end)
+
 -- ════════════════════════════════════════════════════════
 -- 引爆棋子 Action + sg（基于原版 throw_deploy，去掉 useitem_dir_pre 和 symbol 替换）
 -- 链路：技能激活 → PushBufferedAction → sg:wang_detonate_piece 播投掷动画
@@ -419,20 +458,146 @@ local function OnWangSkill2Activate(skill, data)
   return true
 end
 
--- 天下劫第一阶段：地图确认后只完成标准技能激活，后续效果另行接入。
+local WANG_SKILL3_AUTO_INTERVAL = 0.25
+local WANG_SKILL3_DIRECTIONS = {
+  { 0, 1 },
+  { 1, 0 },
+  { 0, -1 },
+  { -1, 0 },
+}
+
+local function HasNianziSword(doer)
+  local item = doer.components.inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
+  return item ~= nil and item.components.nianzi_sword ~= nil
+end
+
+local function ReturnSkill3Bullets(skill)
+  local count = skill.data.bulletCount
+  skill.data.bulletCount = 0
+  for _ = 1, count do
+    local item = SpawnPrefab("piece")
+    if not PieceResource.Give(skill.inst, item) then
+      item.Transform:SetPosition(skill.inst.Transform:GetWorldPosition())
+    end
+  end
+  skill:SyncStatus()
+end
+
+local function OnWangSkill3ManualDeploy(inst, data)
+  local skill = inst.components.ark_skill:GetSkill("wang_skill3")
+  local gx, gz = Grid:CellCoord(data.x, data.z)
+  local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
+  local pending = {}
+  local bulletLimit = math.min(#WANG_SKILL3_DIRECTIONS, skill.data.bulletCount)
+  for index = 1, bulletLimit do
+    local direction = WANG_SKILL3_DIRECTIONS[index]
+    local x = (gx + direction[1] + 0.5) * grid
+    local z = (gz + direction[2] + 0.5) * grid
+    if not Grid:IsCellTaken(x, z) and TheWorld.Map:IsPassableAtPoint(x, 0, z) then
+      local piece = SpawnPrefab("piece")
+      piece.persists = false
+      piece:Hide()
+      if Grid:ReserveCell(piece, x, z) then
+        table.insert(pending, { piece = piece, x = x, z = z })
+      else
+        piece:Remove()
+      end
+    end
+  end
+  if #pending == 0 then
+    if not PieceResource.HasAny(inst) then
+      skill:Cancel(true)
+    end
+    return
+  end
+  skill:CutBullet(#pending)
+  for index, entry in ipairs(pending) do
+    inst:DoTaskInTime((index - 1) * WANG_SKILL3_AUTO_INTERVAL, function()
+      if entry.piece:IsValid() then
+        local piece = entry.piece
+        piece:Show()
+        piece:DeployPiece(Vector3(entry.x, 0, entry.z), {
+          playappear = true,
+          damageMultiplier = 2,
+          explodeRangeMultiplier = 2,
+        })
+      end
+    end)
+  end
+  if not PieceResource.HasAny(inst) then
+    skill:Cancel(true)
+  end
+end
+
+local function OnWangSkill3Install(skill)
+  skill:ListenForEventWhileActivating("wang_skill3_manual_deploy", OnWangSkill3ManualDeploy)
+end
+
 local function OnWangSkill3ActivateTest(skill, params)
+  if not HasNianziSword(skill.inst) then
+    return false, 'WANG_SKILL3_NEED_SWORD'
+  end
   local target = params ~= nil and params.target or nil
   return target ~= nil and target:IsValid()
     and target.prefab == "piece" and target:HasTag("wang_piece_deployed")
 end
 
 local function OnWangSkill3Activate(skill, data)
-  if data == nil or data.target == nil or not data.target:IsValid() then
+  local inst = skill.inst
+  local target = data.target
+  local ox, oy, oz = inst.Transform:GetWorldPosition()
+  local tx, ty, tz = target.Transform:GetWorldPosition()
+  skill:SetState("origin", { x = ox, y = oy, z = oz })
+  skill:SetState("target", { x = tx, y = ty, z = tz })
+  skill:SetState("was_invincible", inst.components.health.invincible)
+  for _ = 1, 10 do
+    local item = SpawnPrefab("piece")
+    if not PieceResource.Give(inst, item) then
+      item:Remove()
+    end
+  end
+  target:Remove()
+end
+
+local function OnWangSkill3ActivateEffect(skill)
+  local inst = skill.inst
+  local origin = skill:GetState("origin")
+  local target = skill:GetState("target")
+  if origin == nil or target == nil then
     return
   end
-  local x, _, z = data.target.Transform:GetWorldPosition()
-  ArkLogger:Debug(string.format("天下劫：选择棋子[%s] 位置(%.1f,%.1f)",
-    tostring(data.target.GUID), x, z))
+  local dummy = skill._wang_skill3_dummy
+  if dummy == nil or not dummy:IsValid() then
+    dummy = SpawnPrefab(inst.prefab)
+    dummy.persists = false
+    dummy.Transform:SetPosition(origin.x, origin.y, origin.z)
+    skill._wang_skill3_dummy = dummy
+  end
+  inst:Hide()
+  inst.components.health:SetInvincible(true)
+  inst.components.locomotor:SetExternalSpeedMultiplier(inst, "wang_skill3_lock", 0)
+  inst.components.locomotor:Stop()
+  inst.Transform:SetPosition(target.x, target.y, target.z)
+  inst._wang_skill3_active:set(true)
+end
+
+local function OnWangSkill3Deactivate(skill)
+  local inst = skill.inst
+  local origin = skill:GetState("origin")
+  local dummy = skill._wang_skill3_dummy
+  if dummy ~= nil then
+    dummy:Remove()
+  end
+  skill._wang_skill3_dummy = nil
+  if origin ~= nil then
+    inst.Transform:SetPosition(origin.x, origin.y, origin.z)
+  end
+  inst:Show()
+  inst.components.health:SetInvincible(skill:GetState("was_invincible") == true)
+  inst.components.locomotor:RemoveExternalSpeedMultiplier(inst, "wang_skill3_lock")
+  inst._wang_skill3_active:set(false)
+  ReturnSkill3Bullets(skill)
+  skill:ClearState()
 end
 
 local skillConfig = {
@@ -513,7 +678,11 @@ local skillConfig = {
       activationEnergy = 10,
       maxActivationStacks = 1,
       params = {},
+      bulletCount = 40,
     } },
+    OnInstall = OnWangSkill3Install,
+    OnActivateEffect = OnWangSkill3ActivateEffect,
+    OnDeactivate = OnWangSkill3Deactivate,
   },
 }
 

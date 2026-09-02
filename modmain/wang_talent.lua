@@ -2,39 +2,10 @@
 -- 被动【铸子】：每 interval 秒生成一枚黑子，按外挂棋盒、背包棋盒、普通背包顺序存放
 -- 参考物品包 RegisterArkTalent + 重岳 chongyue_talent.lua
 
-local function TryPutPieceInBox(box, item)
-  -- drop_on_fail=false：棋盒已满时保留棋子，继续尝试其它目标。
-  return box.components.container:GiveItem(item, nil, nil, false) == true
-end
-
-local function IsExternalPieceBox(inst, box)
-  return box.components.follower:GetLeader() == inst
-    and not box.components.inventoryitem:IsHeld()
-end
+local PieceResource = require "wang_piece_resource"
 
 local function GiveGeneratedPiece(inst, item)
-  local inventory = inst.components.inventory
-
-  -- 1. 先尝试外挂（跟随态）棋盒。
-  local boundbox = inst.components.wang_chess_box_owner:GetBox()
-  if boundbox ~= nil and boundbox:IsValid()
-      and IsExternalPieceBox(inst, boundbox)
-      and TryPutPieceInBox(boundbox, item) then
-    return true
-  end
-
-  -- 2. 再查物品栏和装备栏中的棋盒，装备状态不影响存入。
-  local boxes = inventory:FindItems(function(candidate)
-    return candidate.prefab == "piece_box"
-  end)
-  for _, box in ipairs(boxes) do
-    if TryPutPieceInBox(box, item) then
-      return true
-    end
-  end
-
-  -- 3. 所有棋盒都不存在或已满时，才进入普通物品栏。
-  return inventory:GiveItem(item) and true or false
+  return PieceResource.Give(inst, item)
 end
 
 local function StartZhuzi(talent)

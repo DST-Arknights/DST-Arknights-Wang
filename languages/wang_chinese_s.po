@@ -103,7 +103,7 @@ msgstr "消耗10点SP\n可储存4次"
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3"
 msgid "Costs 181 SP\nWhile active, drains 1 SP per second"
-msgstr "消耗181点SP\n开启后持续消耗1点SP/秒"
+msgstr "消耗10点SP\n获得40发弹药；期间通过拈子剑落子时向四方追加黑子"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
@@ -179,6 +179,11 @@ msgstr "此间无子可引……"
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK"
 msgid "No stones can form a link here"
 msgstr "此间无子可围……"
+
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD"
+msgid "Without the sword, how can I make a move...?"
+msgstr "无剑在手，何以落子……"
 
 #. STRINGS.NAMES.NIANZI_SWORD
 msgctxt "STRINGS.NAMES.NIANZI_SWORD"

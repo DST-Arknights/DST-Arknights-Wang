@@ -103,7 +103,7 @@ msgstr "Costs 10 SP\nCan store 4 charges"
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3"
 msgid "Costs 181 SP\nWhile active, drains 1 SP per second"
-msgstr "Costs 181 SP\nWhile active, drains 1 SP per second"
+msgstr "Costs 10 SP\nGain 40 rounds; sword placements add stones in four directions"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
@@ -179,6 +179,11 @@ msgstr "No deployed stones in range"
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK"
 msgid "No stones can form a link here"
 msgstr "No stones can form a link here"
+
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD"
+msgid "Without the sword, how can I make a move...?"
+msgstr "Without the sword, how can I make a move...?"
 
 #. STRINGS.NAMES.NIANZI_SWORD
 msgctxt "STRINGS.NAMES.NIANZI_SWORD"

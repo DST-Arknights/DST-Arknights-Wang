@@ -27,10 +27,18 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   if not PieceResource.TryConsume(doer, 1) then
     return false, "NO_PIECES"
   end
+  local sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
+  local skill = doer.components.ark_skill ~= nil
+      and doer.components.ark_skill:GetSkill("wang_skill3") or nil
+  local deploydata = { playappear = true }
+  if skill ~= nil and skill:IsActivating() then
+    deploydata.damageMultiplier = 2
+    deploydata.explodeRangeMultiplier = 2
+  end
   local piece = SpawnPrefab("piece")
-  if piece ~= nil then
-    local sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
-    piece:DeployPiece(Vector3(sx, pos.y, sz), { playappear = true })
+  piece:DeployPiece(Vector3(sx, pos.y, sz), deploydata)
+  if skill ~= nil and skill:IsActivating() then
+    doer:PushEvent("wang_skill3_manual_deploy", { x = sx, y = pos.y, z = sz })
   end
   return true
 end)

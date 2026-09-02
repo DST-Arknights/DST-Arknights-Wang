@@ -260,9 +260,8 @@ local function DeployPiecesInArea(doer, cx, cz)
       break -- 包里棋子用尽
     end
     local piece = SpawnPrefab("piece")
-    if piece ~= nil then
-      piece:DeployPiece(Vector3(c[1], 0, c[2]), { playappear = true })
-    end
+    piece.Transform:SetPosition(c[1], 0, c[2])
+    piece:DeployPiece({ playappear = true })
   end
 end
 
@@ -496,6 +495,7 @@ local function OnWangSkill3ManualDeploy(inst, data)
     if not Grid:IsCellTaken(x, z) and TheWorld.Map:IsPassableAtPoint(x, 0, z) then
       local piece = SpawnPrefab("piece")
       piece.persists = false
+      piece.Transform:SetPosition(x, 0, z)
       piece:Hide()
       if Grid:ReserveCell(piece, x, z) then
         table.insert(pending, { piece = piece, x = x, z = z })
@@ -516,7 +516,7 @@ local function OnWangSkill3ManualDeploy(inst, data)
       if entry.piece:IsValid() then
         local piece = entry.piece
         piece:Show()
-        piece:DeployPiece(Vector3(entry.x, 0, entry.z), {
+        piece:DeployPiece({
           playappear = true,
           damageMultiplier = 2,
           explodeRangeMultiplier = 2,

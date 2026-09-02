@@ -474,15 +474,14 @@ local function fn()
     inst:SetPieceActivated(false) -- 连接态不是激活态：取消陷阱武装（防御性）
   end
 
-  -- 落子部署（拈子剑 / 连星复用）：转移到目标点后进入部署态
-  -- pos 需为 Vector3；deploydata.playappear=true 时先播 ChuXian，再转 WeiJiHuo
+  -- 落子部署（拈子剑 / 连星复用）：调用方先设置 Transform，再进入部署态
+  -- deploydata.playappear=true 时先播 ChuXian，再转 WeiJiHuo
   -- 仅主世界可调用
-  inst.DeployPiece = function(_, pos, deploydata)
+  inst.DeployPiece = function(_, deploydata)
     if inst._isdeployed then return end
     deploydata = deploydata or {}
     inst._damageMultiplier = deploydata.damageMultiplier or 1
     inst._explodeRangeMultiplier = deploydata.explodeRangeMultiplier or 1
-    inst.Transform:SetPosition(pos.x, pos.y, pos.z)
     SetDeployedState(inst, deploydata)
   end
 

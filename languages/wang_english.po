@@ -214,3 +214,18 @@ msgstr "Luozi"
 msgctxt "STRINGS.RECIPE_DESC.NIANZI_SWORD"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "He is simply used to placing a stone before things happen."
+
+#. Wang skill 1 active voice line
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_CAST"
+msgid "Time to make a move."
+msgstr "Time to make a move."
+
+#. Wang skill 2 active voice line
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_CAST"
+msgid "Let the stars connect."
+msgstr "Let the stars connect."
+
+#. Wang skill 3 active voice line
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_CAST"
+msgid "The world is the board."
+msgstr "The world is the board."

@@ -6,6 +6,7 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 local ARK_CONSTANTS = require("ark_constants")
 local Grid = require("wang_piecegrid")
 local PieceResource = require("wang_piece_resource")
+local Audio = require("wang_audio")
 
 local function UpdateSkill3Camera(inst)
   if TheWorld.ismastersim or inst ~= ThePlayer or TheCamera == nil then
@@ -60,9 +61,10 @@ AddAction("DETONATE_PIECE", "DETONATE_PIECE", function(act)
     return true
   end
   local multiplier = act.options.multiplier
+  local volume = math.min(0.9, 0.45 + 0.08 * math.min(#pieces, 6))
   for _, piece in ipairs(pieces) do
     if piece:IsValid() and piece.ActiveExplode ~= nil then
-      piece:ActiveExplode(act.doer, multiplier)
+      piece:ActiveExplode(act.doer, multiplier, volume)
     end
   end
   return true
@@ -177,6 +179,7 @@ local function OnWangSkill1Activate(skill, data)
   buff.options.pieces = pieces
   buff.options.multiplier = levelParams.damageMultiplier
   inst:PushBufferedAction(buff)
+  Audio.TrySayVoice(inst, "WANG_SKILL1_CAST")
 
   local x, y, z = pos:Get()
   ArkLogger:Debug(string.format("取势：选择点(%.1f,%.1f,%.1f) 主动引爆 %d 枚黑子，倍率 %.2f",
@@ -187,12 +190,13 @@ end
 
 -- ════════════════════════════════════════════════════════
 -- 连星（技能2）：选区填充 + 棋子互连
--- 链路：选择器确认 → OnActivate → ①网格填充(包里棋子，不重叠) → ②全选区转连接态 → ③邻格互连
+-- 链路：选择器确认 → OnActivate → ①预留网格并在 0.5 秒内随机落子 → ②全选区转连接态 → ③邻格互连
 -- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
 -- ③互连规则：选区内新旧棋子都参与，只连接正交相邻网格，不跨格连接
 -- ════════════════════════════════════════════════════════
 local WANG_SKILL2_AOE_RANGE = 6     -- 选区半径（填充 / 连接范围，大于取势的 4）
 local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
+local WANG_SKILL2_DROP_WINDOW = 0.5 -- 额外落子在此时间内随机出现，避免批量动画完全同步
 
 -- 连星区域选择器（同取势视觉：reticuleaoe 环 + 落点 ping）
 RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
@@ -253,16 +257,34 @@ local function FindDeployCandidates(cx, cz)
   return candidates
 end
 
-local function DeployPiecesInArea(doer, cx, cz)
-  -- 部署：每消耗一枚包里棋子 → 生成一个新棋子到该格点
+local function SchedulePiecesInArea(doer, cx, cz)
+  local pending = {}
   for _, c in ipairs(FindDeployCandidates(cx, cz)) do
-    if not PieceResource.TryConsume(doer, 1) then
-      break -- 包里棋子用尽
-    end
     local piece = SpawnPrefab("piece")
+    piece.persists = false
     piece.Transform:SetPosition(c[1], 0, c[2])
-    piece:DeployPiece({ playappear = true })
+    piece:Hide()
+    if Grid:ReserveCell(piece, c[1], c[2]) then
+      if PieceResource.TryConsume(doer, 1) then
+        table.insert(pending, piece)
+      else
+        piece:Remove()
+        break -- 包里棋子用尽
+      end
+    else
+      piece:Remove()
+    end
   end
+
+  for _, piece in ipairs(pending) do
+    local scheduledPiece = piece
+    scheduledPiece:DoTaskInTime(math.random() * WANG_SKILL2_DROP_WINDOW, function()
+      scheduledPiece.persists = true
+      scheduledPiece:Show()
+      scheduledPiece:DeployPiece({ playappear = true })
+    end)
+  end
+  return #pending
 end
 
 local function CanAcceptLink(piece)
@@ -334,33 +356,47 @@ local function LinkPiecesInArea(pieces)
 end
 
 -- ════════════════════════════════════════════════════════
--- 连星 Action + sg（同取势：走施法动画后执行填充+连接）
+-- 连星 Action + sg（同取势：走施法动画后排程落子+连接）
 -- 链路：技能激活 → PushBufferedAction → sg:wang_lianxing_piece 播投掷动画
---       → Frame 7 PerformBufferedAction → fn 填充+连接 → Frame 22 回 idle
+--       → Frame 7 PerformBufferedAction → 0.5 秒内随机落子 → 统一连接
 -- 动画来源 player_actions_deploytoss.zip（player_common 已加载）
 -- ════════════════════════════════════════════════════════
 
--- 连星 action：fn 从 act.options 读取选区中心，执行填充 + 连接（仅服务端执行）
-AddAction("LIANXING_PIECE", "LIANXING_PIECE", function(act)
-  local opts = act.options
-  if opts == nil or opts.x == nil or opts.z == nil or act.doer == nil then
-    return true
-  end
-  DeployPiecesInArea(act.doer, opts.x, opts.z)
-  local pieces = TheSim:FindEntities(opts.x, 0, opts.z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
+local function FinishLianxing(x, z, doer)
+  local pieces = TheSim:FindEntities(x, 0, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
   for _, p in ipairs(pieces) do
     if p:IsValid() and p.EnterLinkState ~= nil then
       p:EnterLinkState()
     end
   end
   LinkPiecesInArea(pieces)
-  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", opts.x, opts.z, #pieces))
+  if #pieces > 0 and doer ~= nil and doer:IsValid() then
+    Audio.PlaySfx(doer, "skill2_area_explode", 0.6)
+    Audio.PlaySfx(doer, "piece_place", 0.35)
+  end
+  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", x, z, #pieces))
+end
+
+-- 连星 action：fn 从 act.options 读取选区中心，排程落子并在窗口结束后连接（仅服务端执行）
+AddAction("LIANXING_PIECE", "LIANXING_PIECE", function(act)
+  local opts = act.options
+  if opts == nil or opts.x == nil or opts.z == nil or act.doer == nil then
+    return true
+  end
+  local x, z = opts.x, opts.z
+  if SchedulePiecesInArea(act.doer, x, z) > 0 then
+    TheWorld:DoTaskInTime(WANG_SKILL2_DROP_WINDOW, function()
+      FinishLianxing(x, z, act.doer)
+    end)
+  else
+    FinishLianxing(x, z, act.doer)
+  end
   return true
 end)
 ACTIONS.LIANXING_PIECE.distance = 0
 
 -- 共享状态（wilson / wilson_client 同一份，同框架 USE_ARK_CURRENCY 模式）：
--- 服务端 Frame 7 执行填充+连接；客户端仅播动画（PerformPreviewBufferedAction 无操作）
+-- 服务端 Frame 7 排程随机落子；客户端仅播动画（PerformPreviewBufferedAction 无操作）
 -- 与取势共用同一套投掷动画与时间轴（deploytoss_pre + deploytoss，Frame 22 回 idle）
 local wangLianxingState = State {
   name = "wang_lianxing_piece",
@@ -434,11 +470,14 @@ local function OnWangSkill2ActivateTest(skill, params)
     end
     table.insert(earlierCandidates, candidate)
   end
+  if TheWorld.ismastersim then
+    Audio.PlaySfx(skill.inst, "skill_cancel", 0.6)
+  end
   return false, 'WANG_SKILL2_NO_LINK'
 end
 
--- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 执行填充+连接
--- 实际逻辑（填充/连接态/互连）在 action fn（LIANXING_PIECE）中随施法动画帧执行
+-- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 排程随机落子
+-- 实际逻辑（落子/连接态/互连）由 action fn（LIANXING_PIECE）启动并在 0.5 秒窗口结束后完成
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
@@ -451,6 +490,8 @@ local function OnWangSkill2Activate(skill, data)
   buff.options.x = pos.x
   buff.options.z = pos.z
   inst:PushBufferedAction(buff)
+  Audio.TrySayVoice(inst, "WANG_SKILL2_CAST")
+  Audio.PlaySfx(inst, "skill2_select", 0.7)
 
   ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入施法动画", pos.x, pos.z))
 
@@ -556,6 +597,8 @@ local function OnWangSkill3Activate(skill, data)
       item:Remove()
     end
   end
+  Audio.TrySayVoice(inst, "WANG_SKILL3_CAST")
+  Audio.PlaySfx(inst, "skill3_start", 0.7)
   target:Remove()
 end
 
@@ -579,6 +622,7 @@ local function OnWangSkill3ActivateEffect(skill)
   inst.components.locomotor:Stop()
   inst.Transform:SetPosition(target.x, target.y, target.z)
   inst._wang_skill3_active:set(true)
+  Audio.PlaySfx(inst, "skill3_land", 0.7)
 end
 
 local function OnWangSkill3Deactivate(skill)
@@ -596,6 +640,7 @@ local function OnWangSkill3Deactivate(skill)
   inst.components.health:SetInvincible(skill:GetState("was_invincible") == true)
   inst.components.locomotor:RemoveExternalSpeedMultiplier(inst, "wang_skill3_lock")
   inst._wang_skill3_active:set(false)
+  Audio.PlaySfx(inst, "skill_cancel", 0.6)
   ReturnSkill3Bullets(skill)
   skill:ClearState()
 end

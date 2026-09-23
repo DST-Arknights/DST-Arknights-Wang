@@ -205,12 +205,16 @@ local function common_post_init(inst)
   inst:AddTag("reader")        -- 可以阅读书籍
   inst:AddTag("ark_character") -- 物品包框架识别
   inst:AddTag("heavybody")     -- 免疫击飞（原版机制：SGwilson knockback 处理器判定，被击飞时原地落地）
+  if TUNING.WANG ~= nil and TUNING.WANG.VOICE_TALK_PATH ~= nil then
+    inst.talksoundoverride = TUNING.WANG.VOICE_TALK_PATH
+  end
 end
 
 -- ════════════════════════════════════════════════════════
 -- 仅服务端执行：组件 / 属性 / 玩法
 -- ════════════════════════════════════════════════════════
 local function master_post_init(inst)
+  BindVoice(inst, "wang")
   inst.MiniMapEntity:SetIcon("wang.tex")
   -- 基础属性（生命上限会随成长逐渐降低，最低为 1）
   inst.components.health:SetMaxHealth(TUNING.WANG_HEALTH)

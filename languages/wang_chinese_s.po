@@ -214,3 +214,18 @@ msgstr "落子"
 msgctxt "STRINGS.RECIPE_DESC.NIANZI_SWORD"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "他只是习惯在事情发生之前，先落下一子。"
+
+#. 望技能1主动语音文案
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_CAST"
+msgid "Time to make a move."
+msgstr "该落子了。"
+
+#. 望技能2主动语音文案
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_CAST"
+msgid "Let the stars connect."
+msgstr "连星成势。"
+
+#. 望技能3主动语音文案
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_CAST"
+msgid "The world is the board."
+msgstr "天下为局。"

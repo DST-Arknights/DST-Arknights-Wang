@@ -2,6 +2,7 @@ require "prefabutil"
 
 -- 棋子网格占用表（scripts/wang_piecegrid.lua）：整图分区，每格至多 1 枚
 local Grid = require "wang_piecegrid"
+local Audio = require "wang_audio"
 
 -- ════════════════════════════════════════════════════════
 -- 望的棋子（黑子）
@@ -182,6 +183,9 @@ local function SetDeployedState(inst, deploydata)
   DisableEntityCollisions(inst)
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
+  if not deploydata.silent then
+    Audio.PlayPiecePlace(inst)
+  end
   if deploydata.playappear then
     inst.AnimState:PlayAnimation("ChuXian", false)
     inst.AnimState:PushAnimation("WeiJiHuo", true)
@@ -218,6 +222,7 @@ end
 -- ────────────────────────────────────────────────────────
 local function OnTossHit(inst, attacker)
   local x, y, z = inst.Transform:GetWorldPosition()
+  Audio.PlaySfx(inst, "piece_projectile_hit", 0.55)
 
   local ents = TheSim:FindEntities(x, y, z, THROW_AOE, nil, { "INLIMBO", "playerghost" })
   for _, ent in ipairs(ents) do
@@ -355,6 +360,7 @@ local function fn()
   -- 投掷飞行中播放旋转动画（新动画 XuanZuan）；并给目标格打占位（避免连续投掷堆叠）
   inst.components.complexprojectile:SetOnLaunch(function(_, _, targetPos)
     inst.AnimState:PlayAnimation("XuanZuan", true)
+    Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
     if TheWorld.ismastersim then
       Grid:ReserveCell(inst, targetPos.x, targetPos.z)
     end
@@ -405,7 +411,7 @@ local function fn()
       inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
     end
     if data ~= nil and data.isdeployed then
-      SetDeployedState(inst)
+      SetDeployedState(inst, { silent = true })
     end
     if data ~= nil and data.isactive then
       inst:SetPieceActivated(true)
@@ -426,12 +432,13 @@ local function fn()
 
   -- 主动引爆（1技能取势调用）：范围伤害 + 摧毁周围建造物 + 双特效
   -- multiplier: 技能倍率（如 0.9 / 1.1 / 1.3），实际伤害 = 基础伤害 × 倍率
-  inst.ActiveExplode = function(_, source, multiplier)
+  inst.ActiveExplode = function(_, source, multiplier, sfx_volume)
     if not inst._isdeployed then return end
     local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, source, damage, range, true)
     SpawnExplodeFx(inst, true)
+    Audio.PlaySfx(inst, "skill1_active_explode", sfx_volume or 0.6)
     inst:Remove()
   end
 
@@ -443,6 +450,7 @@ local function fn()
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, inst, damage, range, false, source)
     SpawnExplodeFx(inst, false)
+    Audio.PlaySfx(inst, "piece_passive_explode", 0.65)
     inst:Remove()
   end
 

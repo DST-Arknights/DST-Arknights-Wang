@@ -22,6 +22,8 @@ RegisterPOFile(GetModConfigData("language"), {
 PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box'}
 
 Assets = {
+  Asset("SOUNDPACKAGE", "sound/wang.fev"),
+  Asset("SOUND", "sound/wang.fsb"),
 }
 
 AddMinimapAtlas('images/map_icons/wang.xml')
@@ -52,6 +54,27 @@ AddCharacterRecipe("nianzi_sword", {
 -- 常量配置
 -- ════════════════════════════════════════════════════════
 TUNING.WANG = {}
+
+-- 配音语言独立于界面文本；自动模式跟随游戏语言，其他语言默认日语。
+local voice_cfg = GetModConfigData("voice_language")
+local auto_voice_map = {
+  zh = "zh",
+  ja = "jp",
+}
+local voice_lang = voice_cfg == "auto"
+    and (auto_voice_map[LOC.GetLocaleCode(LOC.GetLanguage())] or "jp")
+    or voice_cfg
+if voice_lang ~= "zh" and voice_lang ~= "jp" and voice_lang ~= "hunan" then
+  voice_lang = "jp"
+end
+TUNING.WANG.VOICE_LANG = voice_lang
+TUNING.WANG.VOICE_VOLUME = tonumber(GetModConfigData("voice_volume")) or 0.8
+TUNING.WANG.VOICE_CD = 2
+TUNING.WANG.VOICE_TALK_PATH = "wang/voice_" .. voice_lang .. "/talk_LP"
+RegisterVoice("wang", "languages/wang_voice", {
+  voice_lang = voice_lang,
+  volume = TUNING.WANG.VOICE_VOLUME,
+})
 
 -- 基础属性（望的生命上限会随成长逐渐降低，最低为 1）
 TUNING.WANG_HEALTH = 181

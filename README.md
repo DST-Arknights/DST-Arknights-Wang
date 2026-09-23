@@ -33,8 +33,7 @@ dst-arknights-wang/
 ├── soundSource/             # 音频源文件
 ├── fx/                      # 特效贴图
 ├── tools/
-│   ├── publish.ps1          # 发布脚本（薄封装）
-│   └── publish-config.ps1   # 发布配置（依赖 workshop id）
+│   └── publish.ps1          # 发布脚本与项目发布配置
 └── docs/
 ```
 

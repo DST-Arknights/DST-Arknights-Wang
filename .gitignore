@@ -12,6 +12,8 @@
 /soundSource/**/*.fsb
 /soundSource/**/*.fdp.bak
 /soundSource/**/*.fdp.autosave
+fmod_designer.log
+undo-log.txt
 .fsbcache/
 
 # 动画源文件（导出产物不提交）

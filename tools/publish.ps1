@@ -2,6 +2,7 @@
 #
 # 用法:
 #   pwsh ./tools/publish.ps1 -Bump patch
+#   pwsh ./tools/publish.ps1 major -New
 #   pwsh ./tools/publish.ps1 -DistOnly
 
 $ErrorActionPreference = 'Stop'

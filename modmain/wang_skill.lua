@@ -9,7 +9,8 @@ local PieceResource = require("wang_piece_resource")
 local Audio = require("wang_audio")
 
 local function UpdateSkill3Camera(inst)
-  if TheWorld.ismastersim or inst ~= ThePlayer or TheCamera == nil then
+  -- 相机是本地视觉：专服不处理，房主玩家与远程客户端都需要响应 net_bool。
+  if TheNet:IsDedicated() or inst ~= ThePlayer or TheCamera == nil then
     return
   end
   if inst._wang_skill3_active:value() then
@@ -510,7 +511,225 @@ local function OnWangSkill2Activate(skill, data)
   return true
 end
 
-local WANG_SKILL3_AUTO_INTERVAL = 0.25
+-- 天下劫飞天：参考 Mon3tr 三技能 superjump 的升空 / 返回时序。
+-- 升空到目标后保持隐藏，玩家本体即为空中的下棋位置；技能结束再回跳到起点。
+local WANG_SKILL3_SPEED_KEY = "wang_skill3_lock"
+local WANG_SKILL3_SUPERJUMP_COLOR_R = 75 / 255
+local WANG_SKILL3_SUPERJUMP_COLOR_G = 110 / 255
+local WANG_SKILL3_SUPERJUMP_COLOR_B = 85 / 255
+
+local function ToggleSkill3PhysicsOff(inst)
+  inst.Physics:SetCollisionMask(COLLISION.GROUND)
+end
+
+local function ToggleSkill3PhysicsOn(inst)
+  inst.Physics:SetCollisionMask(
+    COLLISION.WORLD,
+    COLLISION.OBSTACLES,
+    COLLISION.SMALLOBSTACLES,
+    COLLISION.CHARACTERS,
+    COLLISION.GIANTS
+  )
+end
+
+local function RestoreSkill3Player(inst, was_invincible)
+  inst._wang_skill3_airborne = nil
+  inst:Show()
+  inst.DynamicShadow:Enable(true)
+  ToggleSkill3PhysicsOn(inst)
+  if inst.components.health ~= nil then
+    inst.components.health:SetInvincible(was_invincible == true)
+  end
+  if inst.components.locomotor ~= nil then
+    inst.components.locomotor:RemoveExternalSpeedMultiplier(inst, WANG_SKILL3_SPEED_KEY)
+  end
+  if inst._wang_skill3_active ~= nil then
+    inst._wang_skill3_active:set(false)
+  end
+end
+
+-- 起手：完全沿用 Mon3tr 的 superjump_pre → superjump_lag 节奏。
+AddStategraphState("wilson", State {
+  name = "wang_skill3_takeoff_pre",
+  tags = { "aoe", "doing", "busy", "nointerrupt", "nomorph", "pausepredict", "wang_skill3" },
+
+  onenter = function(inst, data)
+    if data == nil or data.targetpos == nil then
+      inst.sg:GoToState("idle", true)
+      return
+    end
+    inst.sg.statemem.data = data
+    inst.components.locomotor:Stop()
+    inst.components.locomotor:SetExternalSpeedMultiplier(inst, WANG_SKILL3_SPEED_KEY, 0)
+    inst.AnimState:PlayAnimation("superjump_pre")
+    inst.AnimState:PushAnimation("superjump_lag")
+    if inst.components.playercontroller ~= nil then
+      inst.components.playercontroller:RemotePausePrediction()
+    end
+  end,
+
+  events = {
+    EventHandler("animover", function(inst)
+      if inst.AnimState:AnimDone() and inst.AnimState:IsCurrentAnimation("superjump_lag") then
+        inst.sg.statemem.continue_takeoff = true
+        inst.sg:GoToState("wang_skill3_takeoff", inst.sg.statemem.data)
+      end
+    end),
+  },
+
+  onexit = function(inst)
+    if not inst.sg.statemem.continue_takeoff then
+      local data = inst.sg.statemem.data
+      RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+    end
+  end,
+})
+
+local function EnterSkill3Airborne(inst, targetpos)
+  inst._wang_skill3_airborne = true
+  inst.components.locomotor:SetExternalSpeedMultiplier(inst, WANG_SKILL3_SPEED_KEY, 0)
+  inst.components.locomotor:Stop()
+  ToggleSkill3PhysicsOff(inst)
+  inst.DynamicShadow:Enable(false)
+  inst.components.health:SetInvincible(true)
+  inst:Hide()
+  inst.Physics:Teleport(targetpos.x, 0, targetpos.z)
+  inst._wang_skill3_active:set(true)
+end
+
+local function CompleteSkill3Takeoff(inst)
+  if inst.sg.statemem.completed then
+    return
+  end
+  local data = inst.sg.statemem.data
+  if data == nil or data.targetpos == nil then
+    inst.sg:GoToState("idle", true)
+    return
+  end
+
+  inst.sg.statemem.completed = true
+  EnterSkill3Airborne(inst, data.targetpos)
+  Audio.PlaySfx(inst, "skill3_land", 0.7)
+  inst.sg:GoToState("idle", true)
+end
+
+-- 升空：参考 Mon3tr 的渐隐阶段；区别是到目标后不落地，而是保持隐藏进行空中下棋。
+AddStategraphState("wilson", State {
+  name = "wang_skill3_takeoff",
+  tags = { "aoe", "doing", "busy", "nointerrupt", "pausepredict", "nomorph", "wang_skill3" },
+
+  onenter = function(inst, data)
+    if data == nil or data.targetpos == nil then
+      inst.sg:GoToState("idle", true)
+      return
+    end
+    inst.sg.statemem.data = data
+    inst.components.locomotor:Stop()
+    ToggleSkill3PhysicsOff(inst)
+    inst.AnimState:PlayAnimation("superjump")
+    inst.AnimState:SetMultColour(.8, .8, .8, 1)
+    inst.components.colouradder:PushColour("wang_skill3", .1, .1, .1, 0)
+    local pos = inst:GetPosition()
+    if pos.x ~= data.targetpos.x or pos.z ~= data.targetpos.z then
+      inst:ForceFacePoint(data.targetpos:Get())
+    end
+    inst.SoundEmitter:PlaySound("dontstarve/movement/bodyfall_dirt", nil, .4)
+    inst.SoundEmitter:PlaySound("dontstarve/common/deathpoof")
+    inst.sg:SetTimeout(0.5)
+  end,
+
+  onupdate = function(inst)
+    if inst.sg.statemem.dalpha ~= nil and inst.sg.statemem.alpha > 0 then
+      inst.sg.statemem.dalpha = math.max(.1, inst.sg.statemem.dalpha - .1)
+      inst.sg.statemem.alpha = math.max(0, inst.sg.statemem.alpha - inst.sg.statemem.dalpha)
+      inst.AnimState:SetMultColour(0, 0, 0, inst.sg.statemem.alpha)
+    end
+  end,
+
+  timeline = {
+    TimeEvent(FRAMES, function(inst)
+      inst.DynamicShadow:Enable(false)
+      inst.sg:AddStateTag("noattack")
+      inst.components.health:SetInvincible(true)
+      inst.AnimState:SetMultColour(.5, .5, .5, 1)
+      inst.components.colouradder:PushColour("wang_skill3",
+        WANG_SKILL3_SUPERJUMP_COLOR_R, WANG_SKILL3_SUPERJUMP_COLOR_G, WANG_SKILL3_SUPERJUMP_COLOR_B, 0)
+    end),
+    TimeEvent(2 * FRAMES, function(inst)
+      inst.AnimState:SetMultColour(0, 0, 0, 1)
+      inst.components.colouradder:PushColour("wang_skill3",
+        WANG_SKILL3_SUPERJUMP_COLOR_R * .9, WANG_SKILL3_SUPERJUMP_COLOR_G * .9,
+        WANG_SKILL3_SUPERJUMP_COLOR_B * .9, 0)
+    end),
+    TimeEvent(3 * FRAMES, function(inst)
+      inst.sg.statemem.alpha = 1
+      inst.sg.statemem.dalpha = .5
+    end),
+  },
+
+  events = {
+    EventHandler("animover", function(inst)
+      if inst.AnimState:AnimDone() then
+        CompleteSkill3Takeoff(inst)
+      end
+    end),
+  },
+
+  ontimeout = CompleteSkill3Takeoff,
+
+  onexit = function(inst)
+    inst.components.colouradder:PopColour("wang_skill3")
+    inst.AnimState:SetMultColour(1, 1, 1, 1)
+    if not inst.sg.statemem.completed then
+      local data = inst.sg.statemem.data
+      RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+    end
+  end,
+})
+
+-- 技能结束返程：空中隐身态直接传回起点并播放落地动画，不再额外播放一次升空。
+AddStategraphState("wilson", State {
+  name = "wang_skill3_return_jump_pst",
+  tags = { "aoe", "doing", "busy", "noattack", "pausepredict", "nomorph", "wang_skill3" },
+
+  onenter = function(inst, data)
+    if data == nil or data.targetpos == nil then
+      RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+      inst.sg:GoToState("idle", true)
+      return
+    end
+    inst.sg.statemem.data = data
+    inst:Show()
+    inst.Physics:Teleport(data.targetpos.x, 0, data.targetpos.z)
+    inst.AnimState:PlayAnimation("superjump_land")
+    inst.SoundEmitter:PlaySound("dontstarve/movement/bodyfall_dirt", nil, .35)
+  end,
+
+  timeline = {
+    TimeEvent(4 * FRAMES, function(inst)
+      local data = inst.sg.statemem.data
+      RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+      inst.sg:RemoveStateTag("noattack")
+    end),
+    TimeEvent(0x13 * FRAMES, PlayFootstep),
+  },
+
+  events = {
+    EventHandler("animover", function(inst)
+      if inst.AnimState:AnimDone() then
+        inst.sg:GoToState("idle")
+      end
+    end),
+  },
+
+  onexit = function(inst)
+    local data = inst.sg.statemem.data
+    RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+  end,
+})
+
+-- 跟随落子由每 0.25 秒一枚改为每 0.20 秒一枚：频率 ×1.25。
+local WANG_SKILL3_AUTO_INTERVAL = 0.20
 local WANG_SKILL3_DIRECTIONS = {
   { 0, 1 },
   { 1, 0 },
@@ -614,46 +833,49 @@ local function OnWangSkill3Activate(skill, data)
   target:Remove()
 end
 
-local function OnWangSkill3ActivateEffect(skill)
+local function OnWangSkill3ActivateEffect(skill, data)
   local inst = skill.inst
-  local origin = skill:GetState("origin")
   local target = skill:GetState("target")
-  if origin == nil or target == nil then
+  if target == nil then
     return
   end
-  local dummy = skill._wang_skill3_dummy
-  if dummy == nil or not dummy:IsValid() then
-    dummy = SpawnPrefab(inst.prefab)
-    dummy.persists = false
-    dummy.Transform:SetPosition(origin.x, origin.y, origin.z)
-    skill._wang_skill3_dummy = dummy
+
+  local targetpos = Vector3(target.x, target.y, target.z)
+  if data ~= nil and data.source == "load" then
+    -- 激活中的技能读档时直接恢复空中位置，不重复播放一次起飞。
+    EnterSkill3Airborne(inst, targetpos)
+    return
   end
-  inst:Hide()
-  inst.components.health:SetInvincible(true)
-  inst.components.locomotor:SetExternalSpeedMultiplier(inst, "wang_skill3_lock", 0)
-  inst.components.locomotor:Stop()
-  inst.Transform:SetPosition(target.x, target.y, target.z)
-  inst._wang_skill3_active:set(true)
-  Audio.PlaySfx(inst, "skill3_land", 0.7)
+
+  -- 不再生成望的假身；本体直接播放 Mon3tr 风格升空，抵达目标后隐藏在空中下棋。
+  inst.sg:GoToState("wang_skill3_takeoff_pre", {
+    targetpos = targetpos,
+    was_invincible = skill:GetState("was_invincible") == true,
+  })
 end
 
 local function OnWangSkill3Deactivate(skill)
   local inst = skill.inst
   local origin = skill:GetState("origin")
-  local dummy = skill._wang_skill3_dummy
-  if dummy ~= nil then
-    dummy:Remove()
-  end
-  skill._wang_skill3_dummy = nil
-  if origin ~= nil then
-    inst.Transform:SetPosition(origin.x, origin.y, origin.z)
-  end
-  inst:Show()
-  inst.components.health:SetInvincible(skill:GetState("was_invincible") == true)
-  inst.components.locomotor:RemoveExternalSpeedMultiplier(inst, "wang_skill3_lock")
-  inst._wang_skill3_active:set(false)
-  Audio.PlaySfx(inst, "skill_cancel", 0.6)
+  local was_invincible = skill:GetState("was_invincible") == true
+
   ReturnSkill3Bullets(skill)
+  Audio.PlaySfx(inst, "skill_cancel", 0.6)
+
+  if inst._wang_skill3_airborne and origin ~= nil then
+    -- 空中隐身态结束后直接回到起点进入落地段，不再播放返程升空动画。
+    inst.sg:GoToState("wang_skill3_return_jump_pst", {
+      targetpos = Vector3(origin.x, origin.y, origin.z),
+      was_invincible = was_invincible,
+    })
+  else
+    -- 若技能在升空完成前被强制结束，立即恢复，避免后续状态再次把人物藏起来。
+    if inst.sg ~= nil and inst.sg:HasStateTag("wang_skill3") then
+      inst.sg:GoToState("idle", true)
+    end
+    RestoreSkill3Player(inst, was_invincible)
+  end
+
   skill:ClearState()
 end
 

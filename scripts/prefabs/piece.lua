@@ -8,20 +8,19 @@ local Audio = require "wang_audio"
 -- 望的棋子（黑子）
 -- 物品态（可堆叠 / 可装备投掷）→ 投掷落地转部署态
 --   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS，水球模式)
---   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁；无实体碰撞（可走穿，间距由网格管）
---   激活态   — 部署后由后续机制（如取势）进入：周期检测引爆半径内单位，命中即被动引爆（陷阱）
---              动画/特效暂未接入，仅逻辑（引爆半径 = 伤害半径，后续可能随某状态翻倍）
+--   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁；自动检测附近敌人并被动引爆
+--              无实体碰撞（可走穿，间距由网格管）；进入连星态后停止陷阱检测
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
 --           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
 -- 网格约束：落点所在格已被占/被占位 → 不投掷（服务端拦截）；飞行漂移落入已占格 → 落地为可拾取物品
 -- 占位：投掷起飞即打目标格占位（ReserveCell），超时自动解锁，避免连续投掷堆叠
--- 引爆：主动(1技能) / 被动(被摧毁 / 激活态探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
+-- 引爆：主动(1技能) / 被动(被摧毁 / 部署态接近探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
 --   XuanZuan — 投掷飞行旋转
 --   ChuXian  — 出现（拈子剑单次落子与二技能批量部署都播）
---   WeiJiHuo — 未激活（部署态待机）
---   JiHuo    — 激活
+--   WeiJiHuo — 部署态待机
+--   JiHuo    — 预留动画（当前无独立激活态）
 -- ════════════════════════════════════════════════════════
 
 -- 物理效果数值（一般不改动，直接放预制体；可调整数值放 modmain）
@@ -32,12 +31,12 @@ local THROW_AOE = 1       -- 落地伤害范围
 -- 爆炸数值（modmain 可调）
 local EXPLODE_RANGE = TUNING.WANG.PIECE_EXPLODE_RANGE or 4 -- 爆炸半径
 
--- 激活态（陷阱）数值
+-- 部署态陷阱数值
 -- 引爆半径 = 伤害半径 = EXPLODE_RANGE（单一数据源，二者自动同步）
 -- 注意：后续某状态（如天下劫）下该值可能翻倍，检测与伤害共用，改这一处即可
-local PROX_CHECK_INTERVAL = 1 -- 激活态检测周期（秒）
+local PROX_CHECK_INTERVAL = 1 -- 部署态检测周期（秒）
 
--- 激活态目标筛选（参考蜜蜂地雷 mine 组件）
+-- 陷阱目标筛选（参考蜜蜂地雷 mine 组件）
 -- 触发：怪物 / 动物 / 敌对角色；"player" 加入禁止表 → 玩家（含望自己）不会触发陷阱
 local PROX_ONEOF_TAGS = { "monster", "character", "animal" }
 local PROX_MUST_TAGS = { "_combat" }
@@ -126,7 +125,7 @@ local function SpawnExplodeFx(inst, active)
 end
 
 -- ────────────────────────────────────────────────────────
--- 激活态被动引爆：周期检测引爆半径内目标，命中即直接爆炸（陷阱）
+-- 部署态被动引爆：周期检测引爆半径内目标，命中即直接爆炸（陷阱）
 -- 参考蜜蜂地雷 mine 组件（DoPeriodicTask + FindEntity）
 -- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸本身对所有可攻击目标造成伤害，不摧毁建造物
 -- ────────────────────────────────────────────────────────
@@ -137,6 +136,20 @@ local function PassiveDetonateCheck(inst)
   end, PROX_MUST_TAGS, PROX_NO_TAGS, PROX_ONEOF_TAGS)
   if target ~= nil then
     inst:PassiveExplode(nil, 1) -- 被动引爆：范围伤害、不摧毁建造物、不记击杀
+  end
+end
+
+local function StartProximityTrap(inst)
+  if inst._proxTask == nil then
+    -- 首次检测延后一整个周期：连星会在 0.5 秒内收尾，可在第一次扫描前关闭任务。
+    inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, PROX_CHECK_INTERVAL)
+  end
+end
+
+local function StopProximityTrap(inst)
+  if inst._proxTask ~= nil then
+    inst._proxTask:Cancel()
+    inst._proxTask = nil
   end
 end
 
@@ -178,14 +191,6 @@ local function EnsureGroundFx(inst)
     inst._groundFx = fx
   end
   return fx
-end
-
-local function RemoveGroundFx(inst)
-  local fx = inst._groundFx
-  if fx ~= nil and fx:IsValid() then
-    fx:Remove()
-  end
-  inst._groundFx = nil
 end
 
 local function PlayInactiveGroundFx(inst)
@@ -240,6 +245,9 @@ local function SetDeployedState(inst, deploydata)
     end
     CreateDeployedMapIcon(inst)
   end
+
+  -- 普通部署态即为陷阱态；连星会在 EnterLinkState 中关闭检测。
+  StartProximityTrap(inst)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -321,15 +329,13 @@ local function OnTossLaunch(inst, _, targetPos)
 end
 
 local function OnRemove(inst)
+  StopProximityTrap(inst)
   Grid:Detach(inst)
 end
 
 local function OnSave(inst, data)
   if inst._isdeployed then
     data.isdeployed = true
-  end
-  if inst._isactive then
-    data.isactive = true
   end
   if inst._islinked then
     data.islinked = true
@@ -352,9 +358,6 @@ local function OnLoad(inst, data)
 
   if data.isdeployed then
     SetDeployedState(inst, { silent = true, randomize = true })
-  end
-  if data.isactive then
-    inst:SetPieceActivated(true)
   end
   if data.islinked then
     inst:EnterLinkState()
@@ -401,8 +404,8 @@ local function fn()
   end
 
   inst._isdeployed = false
-  inst._isactive = false -- 激活态（陷阱）标志
   inst._islinked = false -- 连接态（连星）标志
+  inst._proxTask = nil   -- 仅普通部署态运行；连星/物品等其它状态均关闭
 
   -- 移除时释放网格占用（爆炸/锤毁/投掷异常等一律兜底）
   inst:ListenForEvent("onremove", OnRemove)
@@ -454,7 +457,7 @@ local function fn()
   -- 手动操作（左键"打开连接"=STARTELECTRICLINK / 右键"断开连接"=ENDELECTRICLINK）
   inst:UnregisterComponentActions("electricconnector")
 
-  -- 部署/激活/连接状态存档；electricconnector 自行保存连接关系并在 LoadPostPass 重连
+  -- 部署/连接状态存档；普通部署态读档后自动恢复陷阱，连星态随后关闭；electricconnector 自行重连
   inst.OnSave = OnSave
   inst.OnLoad = OnLoad
 
@@ -491,28 +494,7 @@ local function fn()
     inst:Remove()
   end
 
-  -- 激活态（陷阱）：进入后周期检测引爆半径内单位，命中即被动引爆
-  -- 动画/特效暂未接入；进入退出时机由后续机制（如取势）调用，当前未接触发
-  -- 仅部署态有效；引爆倍率固定 1（取势陷阱的 0.9/1.1/1.3 倍率后续接触发时再传）
-  inst.SetPieceActivated = function(_, armed)
-    if not inst._isdeployed then return end
-    if armed and not inst._isactive then
-      inst._isactive = true
-      RemoveGroundFx(inst)
-      inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, math.random() * 0.5)
-    elseif not armed and inst._isactive then
-      inst._isactive = false
-      if inst._proxTask ~= nil then
-        inst._proxTask:Cancel()
-        inst._proxTask = nil
-      end
-      if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
-        PlayInactiveGroundFx(inst)
-      end
-    end
-  end
-
-  -- 连接态（连星）：不是激活态，不会自动引爆
+  -- 连接态（连星）：关闭普通部署态的接近陷阱，只保留连接行为。
   -- 连接本身由 electricconnector 管理（ConnectTo 建连 / 读档 LoadPostPass 重连）
   -- 可重复调用（幂等）：已是连接态则直接返回
   inst.EnterLinkState = function(_)
@@ -520,7 +502,7 @@ local function fn()
       return
     end
     inst._islinked = true
-    inst:SetPieceActivated(false) -- 连接态不是激活态：取消陷阱武装（防御性）
+    StopProximityTrap(inst)
   end
 
   -- 落子部署（拈子剑 / 连星复用）：调用方先设置 Transform，再进入部署态

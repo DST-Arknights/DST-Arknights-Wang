@@ -122,30 +122,6 @@ configuration_options = { {
         data = "hunan"
     }},
     default = "auto"
-}, {
-    name = "voice_volume",
-    label = T({
-        en = "Voice Volume",
-        zh = "语音音量"
-    }),
-    hover = T({
-        en = "Adjust Wang's active and random voice volume",
-        zh = "调整望的主动语音和随机语音音量"
-    }),
-    options = {{
-        description = T({ en = "40%", zh = "40%" }),
-        data = 0.4
-    }, {
-        description = T({ en = "60%", zh = "60%" }),
-        data = 0.6
-    }, {
-        description = T({ en = "80% (default)", zh = "80%（默认）" }),
-        data = 0.8
-    }, {
-        description = T({ en = "100%", zh = "100%" }),
-        data = 1
-    }},
-    default = 0.8
 }}
 mod_dependencies = {
     {["DST-ArknightsItemPackage"] = false},

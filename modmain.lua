@@ -68,12 +68,10 @@ if voice_lang ~= "zh" and voice_lang ~= "jp" and voice_lang ~= "hunan" then
   voice_lang = "jp"
 end
 TUNING.WANG.VOICE_LANG = voice_lang
-TUNING.WANG.VOICE_VOLUME = tonumber(GetModConfigData("voice_volume")) or 0.8
 TUNING.WANG.VOICE_CD = 2
 TUNING.WANG.VOICE_TALK_PATH = "wang/voice_" .. voice_lang .. "/talk_LP"
 RegisterVoice("wang", "languages/wang_voice", {
   voice_lang = voice_lang,
-  volume = TUNING.WANG.VOICE_VOLUME,
 })
 
 -- 基础属性（望的生命上限会随成长逐渐降低，最低为 1）

@@ -36,7 +36,6 @@ function Audio.TrySayVoice(inst, key, opts)
 
   opts = opts or {}
   opts.voice_channel = opts.voice_channel or "wang_skill_voice"
-  opts.volume = opts.volume or TUNING.WANG.VOICE_VOLUME
   SayAndVoice(inst, key, opts)
   return true
 end

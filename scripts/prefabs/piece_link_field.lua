@@ -51,8 +51,7 @@ local function CreateSegAt(inst, x, z, rot, scale, isend)
   seg.AnimState:SetBank("fence_electric_field_fx")
   seg.AnimState:PlayAnimation("follow_marker_fence_2")
   seg.persists = false
-  seg.fx = CreateSegFx(seg, rot, scale, 0)
-  seg.fx2 = CreateSegFx(seg, rot, scale, 65)
+  seg.fx = CreateSegFx(seg, rot, scale, 40)
   return seg
 end
 

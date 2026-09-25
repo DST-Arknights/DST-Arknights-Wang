@@ -141,10 +141,7 @@ local function PassiveDetonateCheck(inst)
   end
 end
 
--- ────────────────────────────────────────────────────────
--- 随机帧起点：避免读档/同时部署的棋子动画完全同步
--- 供所有转到未激活动画(WeiJiHuo)时调用
--- ────────────────────────────────────────────────────────
+-- 读档恢复时随机待机帧，避免一批存档棋子完全同步
 local function RandomizeAnimFrame(inst)
   local numFrames = inst.AnimState:GetCurrentAnimationNumFrames()
   if numFrames > 0 then
@@ -235,18 +232,11 @@ local function SetDeployedState(inst, deploydata)
       groundFx.AnimState:SetFrame(5)
       groundFx.AnimState:PushAnimation("JiHuo_DiMian-1", true)
     end
-    -- 出现动画播完转 WeiJiHuo 后只随机主体帧；地面 -1 已由 PushAnimation 连续播放，不再重置。
-    local onAppearDone
-    onAppearDone = function()
-      if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
-        RandomizeAnimFrame(inst)
-        inst:RemoveEventCallback("animover", onAppearDone)
-      end
-    end
-    inst:ListenForEvent("animover", onAppearDone)
   else
     inst.AnimState:PlayAnimation("WeiJiHuo", true)
-    RandomizeAnimFrame(inst)
+    if deploydata.randomize then
+      RandomizeAnimFrame(inst)
+    end
     PlayInactiveGroundFx(inst)
   end
 
@@ -456,7 +446,7 @@ local function fn()
       inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
     end
     if data ~= nil and data.isdeployed then
-      SetDeployedState(inst, { silent = true })
+      SetDeployedState(inst, { silent = true, randomize = true })
     end
     if data ~= nil and data.isactive then
       inst:SetPieceActivated(true)

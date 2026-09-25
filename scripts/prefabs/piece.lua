@@ -57,21 +57,22 @@ local prefabs = {
   "piece_ground_fx",
 }
 
-local ground_fx_assets = {
-  Asset("ANIM", "anim/piece.zip"),
-}
-
 -- ────────────────────────────────────────────────────────
 -- 爆炸相关（参考游戏源码 explosive 组件 + 凯尔希二技能子弹）
 -- ────────────────────────────────────────────────────────
 
+local function SpawnFxAt(prefab, x, y, z)
+  local fx = SpawnPrefab(prefab)
+  if fx ~= nil then
+    fx.Transform:SetPosition(x, y, z)
+  end
+end
+
 -- 爆炸命中敌人时，敌人身上播放的两个特效
 local function SpawnHitEnemyFx(ent)
   local x, y, z = ent.Transform:GetWorldPosition()
-  local fx1 = SpawnPrefab("wanda_attack_shadowweapon_old_fx")
-  if fx1 ~= nil then fx1.Transform:SetPosition(x, y, z) end
-  local fx2 = SpawnPrefab("fx_dock_pop")
-  if fx2 ~= nil then fx2.Transform:SetPosition(x, y, z) end
+  SpawnFxAt("wanda_attack_shadowweapon_old_fx", x, y, z)
+  SpawnFxAt("fx_dock_pop", x, y, z)
 end
 
 -- 主动爆炸额外摧毁周围建造物（参考凯尔希二技能子弹命中：collapse_small + workable:Destroy）
@@ -119,11 +120,9 @@ end
 local function SpawnExplodeFx(inst, active)
   local x, y, z = inst.Transform:GetWorldPosition()
   if active then
-    local fx1 = SpawnPrefab("chester_transform_fx")
-    if fx1 ~= nil then fx1.Transform:SetPosition(x, y, z) end
+    SpawnFxAt("chester_transform_fx", x, y, z)
   end
-  local fx2 = SpawnPrefab("wanda_attack_pocketwatch_old_fx")
-  if fx2 ~= nil then fx2.Transform:SetPosition(x, y, z) end
+  SpawnFxAt("wanda_attack_pocketwatch_old_fx", x, y, z)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -192,13 +191,9 @@ end
 local function PlayInactiveGroundFx(inst)
   local fx = EnsureGroundFx(inst)
   if fx ~= nil then
-    if fx.AnimState:IsCurrentAnimation("JiHuo_DiMian-1") then
-      return
-    end
-    fx.AnimState:PlayAnimation("JiHuo_DiMian-1", true)
-    if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
-      fx.AnimState:SetFrame(inst.AnimState:GetCurrentAnimationFrame())
-    end
+    local frame = inst.AnimState:IsCurrentAnimation("WeiJiHuo")
+      and inst.AnimState:GetCurrentAnimationFrame() or nil
+    fx:PlayInactive(frame)
   end
 end
 
@@ -226,11 +221,8 @@ local function SetDeployedState(inst, deploydata)
     local groundFx = EnsureGroundFx(inst)
     inst.AnimState:PlayAnimation("ChuXian", false)
     inst.AnimState:PushAnimation("WeiJiHuo", true)
-    -- 跳过 JiHuo_DiMian-0 前 5 帧空白，不改动画源文件；与 ChuXian 同时起播。
     if groundFx ~= nil then
-      groundFx.AnimState:PlayAnimation("JiHuo_DiMian-0", false)
-      groundFx.AnimState:SetFrame(5)
-      groundFx.AnimState:PushAnimation("JiHuo_DiMian-1", true)
+      groundFx:PlayDeploy()
     end
   else
     inst.AnimState:PlayAnimation("WeiJiHuo", true)
@@ -291,13 +283,13 @@ end
 -- ────────────────────────────────────────────────────────
 -- 装备手上显示
 -- ────────────────────────────────────────────────────────
-local function onequip(inst, owner)
+local function OnEquip(inst, owner)
   owner.AnimState:OverrideSymbol("swap_object", "swap_piece", "swap_object")
   owner.AnimState:Show("ARM_carry")
   owner.AnimState:Hide("ARM_normal")
 end
 
-local function onunequip(inst, owner)
+local function OnUnequip(inst, owner)
   owner.AnimState:ClearOverrideSymbol("swap_object")
   owner.AnimState:Hide("ARM_carry")
   owner.AnimState:Show("ARM_normal")
@@ -311,6 +303,61 @@ local function OnHammered(inst, worker)
     inst:PassiveExplode(worker, 1)  -- 被动引爆倍率 1（无技能加成）
   else
     inst:Remove()
+  end
+end
+
+local function ReticuleTargetFn()
+  return TheInput:GetWorldPosition()
+end
+
+local function CanTossInWorld(_, _, pos)
+  return not Grid:IsCellTakenForAction(pos.x, pos.z)
+end
+
+local function OnTossLaunch(inst, _, targetPos)
+  inst.AnimState:PlayAnimation("XuanZuan", true)
+  Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
+  Grid:ReserveCell(inst, targetPos.x, targetPos.z)
+end
+
+local function OnRemove(inst)
+  Grid:Detach(inst)
+end
+
+local function OnSave(inst, data)
+  if inst._isdeployed then
+    data.isdeployed = true
+  end
+  if inst._isactive then
+    data.isactive = true
+  end
+  if inst._islinked then
+    data.islinked = true
+  end
+  if inst._damageMultiplier ~= 1 then
+    data.damageMultiplier = inst._damageMultiplier
+  end
+  if inst._explodeRangeMultiplier ~= 1 then
+    data.explodeRangeMultiplier = inst._explodeRangeMultiplier
+  end
+end
+
+local function OnLoad(inst, data)
+  if data == nil then
+    return
+  end
+
+  inst._damageMultiplier = data.damageMultiplier or 1
+  inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
+
+  if data.isdeployed then
+    SetDeployedState(inst, { silent = true, randomize = true })
+  end
+  if data.isactive then
+    inst:SetPieceActivated(true)
+  end
+  if data.islinked then
+    inst:EnterLinkState()
   end
 end
 
@@ -341,16 +388,11 @@ local function fn()
 
   -- 瞄准圈（装备时由 playercontroller 创建，客户端组件）
   inst:AddComponent("reticule")
-  inst.components.reticule.targetfn = function()
-    return TheInput:GetWorldPosition()
-  end
+  inst.components.reticule.targetfn = ReticuleTargetFn
 
   -- 投掷落点网格门禁：目标格已被占（含占位）→ 不显示 TOSS（UI 层）
   -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）
-  -- 签名 (self, doer, pos)：采集器冒号调用 inst:CanTossInWorld(doer, pos)
-  inst.CanTossInWorld = function(_, doer, pos)
-    return not Grid:IsCellTakenForAction(pos.x, pos.z)
-  end
+  inst.CanTossInWorld = CanTossInWorld
 
   inst.entity:SetPristine()
 
@@ -363,11 +405,7 @@ local function fn()
   inst._islinked = false -- 连接态（连星）标志
 
   -- 移除时释放网格占用（爆炸/锤毁/投掷异常等一律兜底）
-  inst:ListenForEvent("onremove", function()
-    if TheWorld.ismastersim then
-      Grid:Detach(inst)
-    end
-  end)
+  inst:ListenForEvent("onremove", OnRemove)
 
   inst:AddComponent("inspectable")
 
@@ -381,8 +419,8 @@ local function fn()
   inst:AddComponent("equippable")
   inst.components.equippable.equipslot = EQUIPSLOTS.HANDS
   inst.components.equippable.equipstack = true
-  inst.components.equippable:SetOnEquip(onequip)
-  inst.components.equippable:SetOnUnequip(onunequip)
+  inst.components.equippable:SetOnEquip(OnEquip)
+  inst.components.equippable:SetOnUnequip(OnUnequip)
 
   -- 投掷：item 本身作为抛物线投掷物（waterballoon 模式）
   -- 投掷 = 消耗：TOSS 把装备的单个黑子丢出，落地转部署态，堆叠中其余保留
@@ -392,14 +430,8 @@ local function fn()
   inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
   inst.components.complexprojectile:SetTargetOffset(Vector3(0, 1.5, 0)) -- 终点Y轴抬高，匹配部署飘浮动画
   inst.components.complexprojectile:SetOnHit(OnTossHit)
-  -- 投掷飞行中播放旋转动画（新动画 XuanZuan）；并给目标格打占位（避免连续投掷堆叠）
-  inst.components.complexprojectile:SetOnLaunch(function(_, _, targetPos)
-    inst.AnimState:PlayAnimation("XuanZuan", true)
-    Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
-    if TheWorld.ismastersim then
-      Grid:ReserveCell(inst, targetPos.x, targetPos.z)
-    end
-  end)
+  -- 投掷飞行中播放旋转动画，并给目标格打占位（避免连续投掷堆叠）
+  inst.components.complexprojectile:SetOnLaunch(OnTossLaunch)
 
   -- 部署态可被锤子 / boss 摧毁
   inst:AddComponent("workable")
@@ -422,39 +454,9 @@ local function fn()
   -- 手动操作（左键"打开连接"=STARTELECTRICLINK / 右键"断开连接"=ENDELECTRICLINK）
   inst:UnregisterComponentActions("electricconnector")
 
-  -- 部署/激活/连接状态存档：读档后恢复为地面建筑（激活态陷阱重新武装 / 连接态重连由 electricconnector 的 OnSave/LoadPostPass 负责）
-  inst.OnSave = function(inst, data)
-    if inst._isdeployed then
-      data.isdeployed = true
-    end
-    if inst._isactive then
-      data.isactive = true
-    end
-    if inst._islinked then
-      data.islinked = true
-    end
-    if inst._damageMultiplier ~= 1 then
-      data.damageMultiplier = inst._damageMultiplier
-    end
-    if inst._explodeRangeMultiplier ~= 1 then
-      data.explodeRangeMultiplier = inst._explodeRangeMultiplier
-    end
-  end
-  inst.OnLoad = function(inst, data)
-    if data ~= nil then
-      inst._damageMultiplier = data.damageMultiplier or 1
-      inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
-    end
-    if data ~= nil and data.isdeployed then
-      SetDeployedState(inst, { silent = true, randomize = true })
-    end
-    if data ~= nil and data.isactive then
-      inst:SetPieceActivated(true)
-    end
-    if data ~= nil and data.islinked then
-      inst:EnterLinkState()
-    end
-  end
+  -- 部署/激活/连接状态存档；electricconnector 自行保存连接关系并在 LoadPostPass 重连
+  inst.OnSave = OnSave
+  inst.OnLoad = OnLoad
 
   -- ────────────────────────────────────────────────────────
   -- 引爆方法（挂在棋子实例上，仅部署态有效）
@@ -535,31 +537,4 @@ local function fn()
   return inst
 end
 
-local function ground_fx_fn()
-  local inst = CreateEntity()
-
-  inst.entity:AddTransform()
-  inst.entity:AddAnimState()
-  inst.entity:AddNetwork()
-
-  inst:AddTag("FX")
-  inst:AddTag("NOCLICK")
-
-  inst.AnimState:SetBank("piece")
-  inst.AnimState:SetBuild("piece")
-  inst.AnimState:SetOrientation(ANIM_ORIENTATION.OnGround)
-  inst.AnimState:SetLayer(LAYER_BACKGROUND)
-  inst.AnimState:SetSortOrder(3)
-
-  inst.entity:SetPristine()
-
-  if not TheWorld.ismastersim then
-    return inst
-  end
-
-  inst.persists = false
-  return inst
-end
-
-return Prefab("piece", fn, assets, prefabs),
-  Prefab("piece_ground_fx", ground_fx_fn, ground_fx_assets)
+return Prefab("piece", fn, assets, prefabs)

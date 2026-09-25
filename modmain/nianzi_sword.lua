@@ -37,6 +37,7 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   end
   local deploydata = { playappear = true }
   if skill ~= nil and skill:IsActivating() then
+    deploydata.silent = true
     deploydata.damageMultiplier = 2
     deploydata.explodeRangeMultiplier = 2
   end

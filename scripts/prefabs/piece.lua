@@ -54,6 +54,11 @@ local assets = {
 
 local prefabs = {
   "globalmapiconunderfog",
+  "piece_ground_fx",
+}
+
+local ground_fx_assets = {
+  Asset("ANIM", "anim/piece.zip"),
 }
 
 -- ────────────────────────────────────────────────────────
@@ -166,6 +171,40 @@ local function CreateDeployedMapIcon(inst)
   end
 end
 
+local function EnsureGroundFx(inst)
+  if inst._groundFx ~= nil and inst._groundFx:IsValid() then
+    return inst._groundFx
+  end
+  local fx = SpawnPrefab("piece_ground_fx")
+  if fx ~= nil then
+    fx.entity:SetParent(inst.entity)
+    fx.Transform:SetPosition(0, 0, 0)
+    inst._groundFx = fx
+  end
+  return fx
+end
+
+local function RemoveGroundFx(inst)
+  local fx = inst._groundFx
+  if fx ~= nil and fx:IsValid() then
+    fx:Remove()
+  end
+  inst._groundFx = nil
+end
+
+local function PlayInactiveGroundFx(inst)
+  local fx = EnsureGroundFx(inst)
+  if fx ~= nil then
+    if fx.AnimState:IsCurrentAnimation("JiHuo_DiMian-1") then
+      return
+    end
+    fx.AnimState:PlayAnimation("JiHuo_DiMian-1", true)
+    if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
+      fx.AnimState:SetFrame(inst.AnimState:GetCurrentAnimationFrame())
+    end
+  end
+end
+
 -- ────────────────────────────────────────────────────────
 -- 部署态：投掷落地 / 技能放置后转地面建筑
 -- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
@@ -187,11 +226,16 @@ local function SetDeployedState(inst, deploydata)
     Audio.PlayPiecePlace(inst)
   end
   if deploydata.playappear then
+    local groundFx = EnsureGroundFx(inst)
     inst.AnimState:PlayAnimation("ChuXian", false)
     inst.AnimState:PushAnimation("WeiJiHuo", true)
-    -- 出现动画播完转 WeiJiHuo 后随机起始帧（拈子剑/二技能批量部署也避免动画全同步）
-    -- 一次性监听：首次 animover 正是 ChuXian 结束（或 WeiJiHuo 首个循环），命中即随机并解绑
-    -- 先声明再赋值：闭包内自引用 onAppearDone 需指向本 local（local 作用域自赋值语句之后才开始）
+    -- 跳过 JiHuo_DiMian-0 前 5 帧空白，不改动画源文件；与 ChuXian 同时起播。
+    if groundFx ~= nil then
+      groundFx.AnimState:PlayAnimation("JiHuo_DiMian-0", false)
+      groundFx.AnimState:SetFrame(5)
+      groundFx.AnimState:PushAnimation("JiHuo_DiMian-1", true)
+    end
+    -- 出现动画播完转 WeiJiHuo 后只随机主体帧；地面 -1 已由 PushAnimation 连续播放，不再重置。
     local onAppearDone
     onAppearDone = function()
       if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
@@ -203,6 +247,7 @@ local function SetDeployedState(inst, deploydata)
   else
     inst.AnimState:PlayAnimation("WeiJiHuo", true)
     RandomizeAnimFrame(inst)
+    PlayInactiveGroundFx(inst)
   end
 
   -- 注册网格占用（异常路径兜底：正常部署前调用方已查 IsCellTaken）
@@ -461,12 +506,16 @@ local function fn()
     if not inst._isdeployed then return end
     if armed and not inst._isactive then
       inst._isactive = true
+      RemoveGroundFx(inst)
       inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, math.random() * 0.5)
     elseif not armed and inst._isactive then
       inst._isactive = false
       if inst._proxTask ~= nil then
         inst._proxTask:Cancel()
         inst._proxTask = nil
+      end
+      if inst.AnimState:IsCurrentAnimation("WeiJiHuo") then
+        PlayInactiveGroundFx(inst)
       end
     end
   end
@@ -496,4 +545,31 @@ local function fn()
   return inst
 end
 
-return Prefab("piece", fn, assets, prefabs)
+local function ground_fx_fn()
+  local inst = CreateEntity()
+
+  inst.entity:AddTransform()
+  inst.entity:AddAnimState()
+  inst.entity:AddNetwork()
+
+  inst:AddTag("FX")
+  inst:AddTag("NOCLICK")
+
+  inst.AnimState:SetBank("piece")
+  inst.AnimState:SetBuild("piece")
+  inst.AnimState:SetOrientation(ANIM_ORIENTATION.OnGround)
+  inst.AnimState:SetLayer(LAYER_BACKGROUND)
+  inst.AnimState:SetSortOrder(3)
+
+  inst.entity:SetPristine()
+
+  if not TheWorld.ismastersim then
+    return inst
+  end
+
+  inst.persists = false
+  return inst
+end
+
+return Prefab("piece", fn, assets, prefabs),
+  Prefab("piece_ground_fx", ground_fx_fn, ground_fx_assets)

@@ -19,7 +19,7 @@ RegisterPOFile(GetModConfigData("language"), {
 -- ════════════════════════════════════════════════════════
 -- 角色注册
 -- ════════════════════════════════════════════════════════
-PrefabFiles = {'wang', 'wang_none', 'piece', 'piece_ground_fx', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box'}
+PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box'}
 
 Assets = {
   Asset("SOUNDPACKAGE", "sound/wang.fev"),

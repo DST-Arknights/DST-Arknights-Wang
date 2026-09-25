@@ -53,7 +53,6 @@ local assets = {
 
 local prefabs = {
   "globalmapiconunderfog",
-  "piece_ground_fx",
 }
 
 -- ────────────────────────────────────────────────────────
@@ -180,25 +179,56 @@ local function CreateDeployedMapIcon(inst)
   end
 end
 
-local function EnsureGroundFx(inst)
-  if inst._groundFx ~= nil and inst._groundFx:IsValid() then
-    return inst._groundFx
-  end
-  local fx = SpawnPrefab("piece_ground_fx")
-  if fx ~= nil then
-    fx.entity:SetParent(inst.entity)
-    fx.Transform:SetPosition(0, 0, 0)
-    inst._groundFx = fx
-  end
+-- 脚底动画纯客户端生成：非网络实体，不参与存档，也不在专服创建。
+-- 只在棋子真正进入部署态后触发；棋子预占位时虽然实体已生成，但不会提前创建 FX。
+local function CreateGroundFx(parent)
+  local fx = CreateEntity()
+
+  fx.entity:AddTransform()
+  fx.entity:AddAnimState()
+
+  fx:AddTag("FX")
+  fx:AddTag("NOCLICK")
+  fx.persists = false
+
+  fx.AnimState:SetBank("piece")
+  fx.AnimState:SetBuild("piece")
+  fx.AnimState:SetOrientation(ANIM_ORIENTATION.OnGround)
+  fx.AnimState:SetLayer(LAYER_BACKGROUND)
+  fx.AnimState:SetSortOrder(3)
+  fx.AnimState:PlayAnimation("JiHuo_DiMian-0", false)
+  fx.AnimState:SetFrame(5)
+  fx.AnimState:PushAnimation("JiHuo_DiMian-1", true)
+
+  parent:AddChild(fx)
+  fx.Transform:SetPosition(0, 0, 0)
   return fx
 end
 
-local function PlayInactiveGroundFx(inst)
-  local fx = EnsureGroundFx(inst)
-  if fx ~= nil then
-    local frame = inst.AnimState:IsCurrentAnimation("WeiJiHuo")
-      and inst.AnimState:GetCurrentAnimationFrame() or nil
-    fx:PlayInactive(frame)
+local function TryCreateGroundFx(inst)
+  inst._groundFxTask = nil
+  if not inst._showGroundFx:value()
+      or (inst._groundFx ~= nil and inst._groundFx:IsValid()) then
+    return
+  end
+  if not inst.entity:IsVisible() then
+    inst._groundFxTask = inst:DoTaskInTime(0, TryCreateGroundFx)
+    return
+  end
+  inst._groundFx = CreateGroundFx(inst)
+end
+
+local function OnGroundFxDirty(inst)
+  if inst._showGroundFx:value()
+      and inst._groundFxTask == nil
+      and not (inst._groundFx ~= nil and inst._groundFx:IsValid()) then
+    inst._groundFxTask = inst:DoTaskInTime(0, TryCreateGroundFx)
+  end
+end
+
+local function EnableGroundFx(inst)
+  if not inst._showGroundFx:value() then
+    inst._showGroundFx:set(true)
   end
 end
 
@@ -223,19 +253,15 @@ local function SetDeployedState(inst, deploydata)
     Audio.PlayPiecePlace(inst)
   end
   if deploydata.playappear then
-    local groundFx = EnsureGroundFx(inst)
     inst.AnimState:PlayAnimation("ChuXian", false)
     inst.AnimState:PushAnimation("WeiJiHuo", true)
-    if groundFx ~= nil then
-      groundFx:PlayDeploy()
-    end
   else
     inst.AnimState:PlayAnimation("WeiJiHuo", true)
     if deploydata.randomize then
       RandomizeAnimFrame(inst)
     end
-    PlayInactiveGroundFx(inst)
   end
+  EnableGroundFx(inst)
 
   -- 注册网格占用（异常路径兜底：正常部署前调用方已查 IsCellTaken）
   if TheWorld.ismastersim then
@@ -396,6 +422,13 @@ local function fn()
   -- 投掷落点网格门禁：目标格已被占（含占位）→ 不显示 TOSS（UI 层）
   -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）
   inst.CanTossInWorld = CanTossInWorld
+
+  -- 部署是一次性状态，用父棋子的 1 bit net_bool 通知各客户端创建本地脚底 FX。
+  -- FX 自身完全不联网；专服只同步这个已有实体上的状态位。
+  inst._showGroundFx = net_bool(inst.GUID, "piece._showGroundFx", "piece_groundfxdirty")
+  if not TheNet:IsDedicated() then
+    inst:ListenForEvent("piece_groundfxdirty", OnGroundFxDirty)
+  end
 
   inst.entity:SetPristine()
 

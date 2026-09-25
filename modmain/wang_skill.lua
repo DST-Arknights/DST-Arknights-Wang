@@ -257,7 +257,7 @@ local function FindDeployCandidates(cx, cz)
   return candidates
 end
 
-local function SchedulePiecesInArea(doer, cx, cz)
+local function SchedulePiecesInArea(doer, cx, cz, oncomplete)
   local pending = {}
   for _, c in ipairs(FindDeployCandidates(cx, cz)) do
     local piece = SpawnPrefab("piece")
@@ -276,12 +276,28 @@ local function SchedulePiecesInArea(doer, cx, cz)
     end
   end
 
+  if #pending == 0 then
+    if oncomplete ~= nil then
+      oncomplete()
+    end
+    return 0
+  end
+
+  -- 不再依赖固定 0.5 秒后扫描：最后一个随机落子真正部署完成后才统一建连，
+  -- 避免末批落子与 FinishLianxing 落在同一 tick 时漏进 FindEntities。
+  local remaining = #pending
   for _, piece in ipairs(pending) do
     local scheduledPiece = piece
-    scheduledPiece:DoTaskInTime(math.random() * WANG_SKILL2_DROP_WINDOW, function()
-      scheduledPiece.persists = true
-      scheduledPiece:Show()
-      scheduledPiece:DeployPiece({ playappear = true })
+    TheWorld:DoTaskInTime(math.random() * WANG_SKILL2_DROP_WINDOW, function()
+      if scheduledPiece:IsValid() then
+        scheduledPiece.persists = true
+        scheduledPiece:Show()
+        scheduledPiece:DeployPiece({ playappear = true })
+      end
+      remaining = remaining - 1
+      if remaining == 0 and oncomplete ~= nil then
+        oncomplete()
+      end
     end)
   end
   return #pending
@@ -377,20 +393,16 @@ local function FinishLianxing(x, z, doer)
   ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", x, z, #pieces))
 end
 
--- 连星 action：fn 从 act.options 读取选区中心，排程落子并在窗口结束后连接（仅服务端执行）
+-- 连星 action：fn 从 act.options 读取选区中心，排程随机落子；最后一枚完成部署后再统一连接（仅服务端执行）
 AddAction("LIANXING_PIECE", "LIANXING_PIECE", function(act)
   local opts = act.options
   if opts == nil or opts.x == nil or opts.z == nil or act.doer == nil then
     return true
   end
   local x, z = opts.x, opts.z
-  if SchedulePiecesInArea(act.doer, x, z) > 0 then
-    TheWorld:DoTaskInTime(WANG_SKILL2_DROP_WINDOW, function()
-      FinishLianxing(x, z, act.doer)
-    end)
-  else
+  SchedulePiecesInArea(act.doer, x, z, function()
     FinishLianxing(x, z, act.doer)
-  end
+  end)
   return true
 end)
 ACTIONS.LIANXING_PIECE.distance = 0
@@ -477,7 +489,7 @@ local function OnWangSkill2ActivateTest(skill, params)
 end
 
 -- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 排程随机落子
--- 实际逻辑（落子/连接态/互连）由 action fn（LIANXING_PIECE）启动并在 0.5 秒窗口结束后完成
+-- 实际逻辑（落子/连接态/互连）由 action fn（LIANXING_PIECE）启动，并在最后一枚随机落子完成后统一收尾
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then

@@ -14,8 +14,8 @@ local Skill3MapMarkers = require "wang_skill3_mapmarkers"
 --              无实体碰撞（可走穿，间距由网格管）；进入连星态后停止陷阱检测
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
 --           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
--- 网格约束：落点所在格已被占/被占位 → 不投掷（服务端拦截）；飞行漂移落入已占格 → 落地为可拾取物品
--- 占位：投掷起飞即尝试占目标格（TryOccupy），超时自动解锁，避免连续投掷堆叠
+-- 网格约束：目标格已有棋子实体 → 不投掷；投掷起飞时目标格立即生成隐藏的最终棋子实体
+-- 占格：棋子先确定位置，再通过 net_bool 声明占格；主客机各自维护同一份本地快捷网格
 -- 引爆：主动(1技能) / 被动(被摧毁 / 部署态接近探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
@@ -132,7 +132,8 @@ end
 
 local function GetExplodeDamage(inst, multiplier)
   local x, _, z = inst.Transform:GetWorldPosition()
-  local neighbors = Grid:CountNeighbors(x, z, inst._neighborMode)
+  local gx, gz = Grid:WorldToCell(x, z)
+  local neighbors = Grid:CountNeighbors(gx, gz, inst._neighborMode)
   return (inst._baseDamage + inst._eliteBonusDamage) * inst._damageMultiplier
       * (1 + TUNING.WANG.PIECE_NEIGHBOR_DAMAGE_BONUS * neighbors) * (multiplier or 1)
 end
@@ -182,7 +183,7 @@ local function DisableEntityCollisions(inst)
 end
 
 -- 脚底动画纯客户端生成：非网络实体，不参与存档，也不在专服创建。
--- 只在棋子真正进入部署态后触发；棋子预占位时虽然实体已生成，但不会提前创建 FX。
+-- 只在棋子真正进入部署态后触发；隐藏占格棋子虽然实体已生成，但不会提前创建 FX。
 local function CreateGroundFx(parent)
   local fx = CreateEntity()
 
@@ -239,26 +240,65 @@ end
 -- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
 -- 网格注册统一走这里：投掷/拈子剑/连星/读档恢复 → 自动重建占用表
 -- ────────────────────────────────────────────────────────
-local function ReleaseGridCell(inst)
-  if inst._wang_gridX ~= nil then
-    Grid:Release(inst._wang_gridX, inst._wang_gridZ)
-    inst._wang_gridX, inst._wang_gridZ = nil, nil
+local function ApplyCellOccupiedState(inst)
+  if inst._wang_cell_occupied:value() then
+    local x, _, z = inst.Transform:GetWorldPosition()
+    local gx, gz = Grid:WorldToCell(x, z)
+    return Grid:Register(inst, gx, gz)
   end
+  Grid:Unregister(inst, false)
+  return true
+end
+
+local function OnCellOccupiedDirty(inst)
+  -- 服务端在修改 net_bool 时同步更新自己的缓存；远程客户端由 dirty 事件走同一登记逻辑。
+  if not TheWorld.ismastersim then
+    ApplyCellOccupiedState(inst)
+  end
+end
+
+local function OnGridEntityRemove(inst)
+  -- 删除实体时客户端也要清本地缓存；邻子残留只有服务端伤害计算需要。
+  Grid:Unregister(inst, TheWorld.ismastersim and inst._isdeployed == true)
+end
+
+local function DeclareCellOccupied(inst)
+  local x, _, z = inst.Transform:GetWorldPosition()
+  local gx, gz = Grid:WorldToCell(x, z)
+  local current = Grid:GetPiece(gx, gz)
+  if current ~= nil and current ~= inst then
+    return false
+  end
+  if not inst._wang_cell_occupied:value() then
+    inst._wang_cell_occupied:set(true)
+  end
+  return ApplyCellOccupiedState(inst)
+end
+
+-- 延迟落子 / 投掷使用：调用前必须先确定 Transform；随后只声明“我占当前格”。
+local function ReserveDeployCell(inst)
+  if inst._isdeployed or not DeclareCellOccupied(inst) then
+    return false
+  end
+  inst.persists = false
+  inst.components.inventoryitem.canbepickedup = false
+  inst.components.workable:SetWorkable(false)
+  inst:Hide()
+  return true
 end
 
 local function SetDeployedState(inst, options)
   if inst._isdeployed then
     return true
   end
-  local x, _, z = inst.Transform:GetWorldPosition()
-  if not Grid:SetPiece(x, z, inst) then
+  if not DeclareCellOccupied(inst) then
     return false
   end
-  inst._wang_gridX, inst._wang_gridZ = x, z
   options = options or {}
 
   inst._isdeployed = true
   inst.persists = true
+  inst:Show()
   inst:AddTag("structure")
   inst:AddTag("wang_piece_deployed") -- 已部署标记：供 1 技能引爆检索
   DisableEntityCollisions(inst)
@@ -288,8 +328,8 @@ end
 
 -- ────────────────────────────────────────────────────────
 -- 投掷落地（complexprojectile onhit）：
--- 落点附近伤害 + 清投掷占位 + 按落点格占用 → 特效遮盖 + 转部署态（不播出现动画）
--- 落点格被占（漂移边界）→ 不部署，落地为可拾取物品（不浪费）
+-- 飞行物在实际命中点造成伤害；目标格的隐藏最终棋子转部署态并显形。
+-- 若预部署实体异常失效，则飞行棋子落地为可拾取物品，不制造无实体占位。
 -- ────────────────────────────────────────────────────────
 local function OnTossHit(inst, attacker)
   local x, y, z = inst.Transform:GetWorldPosition()
@@ -303,17 +343,20 @@ local function OnTossHit(inst, attacker)
     end
   end
 
-  -- 释放起飞时的占位，再按实际落点登记；漂移冲突时保留为可拾取物品。
-  ReleaseGridCell(inst)
-  local sx, sz = Grid:SnapPos(x, z)
-  inst.Transform:SetPosition(sx, y, sz)
-  if Grid:IsCellTaken(sx, sz) or not inst:DeployPiece() then
-    inst.AnimState:PlayAnimation("idle", true)
+  -- 目标格的隐藏棋子在起飞时已经声明占格；命中后只负责显形并转部署态。
+  local reserved = inst._wang_toss_target_piece
+  inst._wang_toss_target_piece = nil
+  if reserved ~= nil and reserved:IsValid() and reserved:DeployPiece() then
+    SpawnExplodeFx(reserved, true)
+    inst:Remove()
     return
   end
 
-  -- 特效遮盖黑子生成过程（同主动爆炸特效）
-  SpawnExplodeFx(inst, true)
+  -- 极端异常（预部署实体被外部移除）时不凭空占格，飞行棋子落地后仍可拾取。
+  if reserved ~= nil and reserved:IsValid() then
+    reserved:Remove()
+  end
+  inst.AnimState:PlayAnimation("idle", true)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -347,22 +390,52 @@ local function ReticuleTargetFn()
 end
 
 local function CanTossInWorld(_, _, pos)
-  return not Grid:IsCellTakenForAction(pos.x, pos.z)
+  -- 兼容不同版本的原版动作采集器：旧版这里只传 doer，新版会把 point 一并传入。
+  pos = pos or (TheInput ~= nil and TheInput:GetWorldPosition() or nil)
+  if pos == nil then
+    return true
+  end
+  local gx, gz = Grid:WorldToCell(pos.x, pos.z)
+  return not Grid:IsOccupied(gx, gz)
+end
+
+local function CopyDeploySnapshot(source, target)
+  target._baseDamage = source._baseDamage
+  target._eliteBonusDamage = source._eliteBonusDamage
+  target._damageMultiplier = source._damageMultiplier
+  target._explodeRangeMultiplier = source._explodeRangeMultiplier
+  target._neighborMode = source._neighborMode
+  target._deployer = source._deployer
+  target._deployerUserid = source._deployerUserid
 end
 
 local function OnTossLaunch(inst, attacker, targetPos)
   inst:PushEvent("wang_piece_toss_launch", { deployer = attacker })
   inst.AnimState:PlayAnimation("XuanZuan", true)
   Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
-  if Grid:TryOccupy(targetPos.x, targetPos.z) then
-    inst._wang_gridX, inst._wang_gridZ = targetPos.x, targetPos.z
+
+  -- 飞行物自身会移动，不能代表目标格占用；目标格提前生成隐藏的最终棋子实体。
+  local sx, sz = Grid:SnapWorldPos(targetPos.x, targetPos.z)
+  local reserved = SpawnPrefab("piece")
+  if reserved ~= nil then
+    CopyDeploySnapshot(inst, reserved)
+    reserved.Transform:SetPosition(sx, 0, sz)
+    if reserved:ReserveDeployCell() then
+      inst._wang_toss_target_piece = reserved
+    else
+      reserved:Remove()
+    end
   end
 end
 
 local function OnRemove(inst)
   StopProximityTrap(inst)
   Skill3MapMarkers:Unregister(inst)
-  ReleaseGridCell(inst)
+  local reserved = inst._wang_toss_target_piece
+  inst._wang_toss_target_piece = nil
+  if reserved ~= nil and reserved:IsValid() and not reserved._isdeployed then
+    reserved:Remove()
+  end
   PieceLimit:Unregister(inst)
 end
 
@@ -430,9 +503,14 @@ local function fn()
   inst:AddComponent("reticule")
   inst.components.reticule.targetfn = ReticuleTargetFn
 
-  -- 投掷落点网格门禁：目标格已被占（含占位）→ 不显示 TOSS（UI 层）
-  -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）
+  -- 投掷落点网格门禁：动作采集器只查询本机 Grid.cells。
+  -- 服务端权威拦截在 modmain/wang_piecegrid.lua（包 ACTIONS.TOSS.fn）。
   inst.CanTossInWorld = CanTossInWorld
+
+  -- 占格是棋子自身的联网状态。位置必须先确定，再把此位设为 true；客户端 dirty 后按当前 Transform 登记本地网格。
+  inst._wang_cell_occupied = net_bool(inst.GUID, "piece._wang_cell_occupied", "piece_cell_occupied_dirty")
+  inst:ListenForEvent("piece_cell_occupied_dirty", OnCellOccupiedDirty)
+  inst:ListenForEvent("onremove", OnGridEntityRemove)
 
   -- 部署是一次性状态，用父棋子的 1 bit net_bool 通知各客户端创建本地脚底 FX。
   -- FX 自身完全不联网；专服只同步这个已有实体上的状态位。
@@ -444,6 +522,8 @@ local function fn()
   inst.entity:SetPristine()
 
   if not TheWorld.ismastersim then
+    -- 初次收到实体时补一次当前网络状态，避免只依赖 dirty 边沿。
+    inst:DoTaskInTime(0, ApplyCellOccupiedState)
     return inst
   end
 
@@ -451,7 +531,7 @@ local function fn()
   inst._islinked = false -- 连接态（连星）标志
   inst._proxTask = nil   -- 仅普通部署态运行；连星/物品等其它状态均关闭
 
-  -- 移除时释放网格占用（爆炸/锤毁/投掷异常等一律兜底）
+  -- 服务端移除时清理玩法状态；网格释放由上方主客机共用的 onremove 监听统一处理。
   inst:ListenForEvent("onremove", OnRemove)
 
   inst:AddComponent("inspectable")
@@ -477,7 +557,7 @@ local function fn()
   inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
   inst.components.complexprojectile:SetTargetOffset(Vector3(0, 1.5, 0)) -- 终点Y轴抬高，匹配部署飘浮动画
   inst.components.complexprojectile:SetOnHit(OnTossHit)
-  -- 投掷飞行中播放旋转动画，并给目标格打占位（避免连续投掷堆叠）
+  -- 投掷飞行中播放旋转动画，并在目标格生成隐藏最终棋子（避免连续投掷堆叠）
   inst.components.complexprojectile:SetOnLaunch(OnTossLaunch)
 
   -- 部署态可被锤子 / boss 摧毁
@@ -550,7 +630,8 @@ local function fn()
     StopProximityTrap(inst)
   end
 
-  -- 属性和 Transform 由外部先设好；这里只切换部署态，选项仅控制表现。
+  -- 属性和 Transform 由外部先设好；预部署只声明当前格占用，完成动作后 DeployPiece 显形。
+  inst.ReserveDeployCell = ReserveDeployCell
   inst.DeployPiece = SetDeployedState
 
   return inst

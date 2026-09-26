@@ -4,7 +4,7 @@
 --       → sg:wang_luozi 播剑攻击动画(atk_pre/atk) → Frame 7 执行 fn
 --       → fn 消耗背包一枚黑子，目标点生成部署态棋子（播 ChuXian 出现动画）
 -- 施法距离：action.distance = 15（玩家会走近到 15 格内执行）
--- 网格：落点格已被占/被占位 → 不显示动作（客户端）/ 不消耗不部署（服务端 fn 权威）
+-- 网格：落点格已有占格棋子 → 不显示动作（客户端）/ 不消耗不部署（服务端 fn 权威）
 -- ════════════════════════════════════════════════════════
 local Grid = require "wang_piecegrid"
 local PieceResource = require "wang_piece_resource"
@@ -21,8 +21,9 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   if not PieceResource.HasAny(doer) then
     return false, "NO_PIECES"
   end
-  -- 网格检查：落点格已被占/被占位 → 不消耗不部署
-  if Grid:IsCellTaken(pos.x, pos.z) then
+  -- 网格检查：业务层统一先把世界坐标转成网格坐标，再做 O(1) 查询。
+  local gx, gz = Grid:WorldToCell(pos.x, pos.z)
+  if Grid:IsOccupied(gx, gz) then
     return false, "CELL_OCCUPIED"
   end
   if not PieceResource.TryConsume(doer, 1) then
@@ -33,9 +34,9 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   local skill3Active = skill ~= nil and skill:IsActivating()
   local sx, sz
   if skill3Active then
-    sx, sz = Grid:CellCenterAt(pos.x, pos.z)
+    sx, sz = Grid:CellCenter(gx, gz)
   else
-    sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
+    sx, sz = Grid:SnapWorldPos(pos.x, pos.z) -- 吸附 ON → 格中心
   end
   local piece = SpawnPrefab("piece")
   piece._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
@@ -60,13 +61,16 @@ ACTIONS.WANG_LUOZI.distance = 20 -- 施法 / 走近距离
 ACTIONS.WANG_LUOZI.rmb = true
 
 -- POINT 采集器：装备拈子剑（含 nianzi_sword 组件）右键点击可通行地面时生成落子动作
--- 背包有黑子 + 落点格空闲才显示；客户端通过 replica.inventory / IsCellTakenForAction 判断
+-- 背包有黑子 + 落点格空闲才显示；主客机都只查询自己的本地网格缓存。
 AddComponentAction("POINT", "nianzi_sword", function(inst, doer, pos, actions, right, target)
-  if right
-      and doer ~= nil and not doer:HasTag("playerghost")
-      and PieceResource.HasAny(doer)
-      and TheWorld.Map ~= nil and not TheWorld.Map:IsGroundTargetBlocked(pos)
-      and not Grid:IsCellTakenForAction(pos.x, pos.z) then
+  if not right
+      or doer == nil or doer:HasTag("playerghost")
+      or not PieceResource.HasAny(doer)
+      or TheWorld.Map == nil or TheWorld.Map:IsGroundTargetBlocked(pos) then
+    return
+  end
+  local gx, gz = Grid:WorldToCell(pos.x, pos.z)
+  if not Grid:IsOccupied(gx, gz) then
     table.insert(actions, ACTIONS.WANG_LUOZI)
   end
 end)

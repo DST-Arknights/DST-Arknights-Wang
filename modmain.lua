@@ -98,10 +98,9 @@ TUNING.WANG.PIECE_NEIGHBOR_LINGER = 2         -- 棋子消失后邻格加成保�
 -- 连星（二技能）：棋子连接
 TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数
 
--- 棋子网格（全地图分区，每格至多 1 枚已部署棋子；投掷/拈子剑/连星统一约束）
+-- 棋子网格（全地图分区，每格至多 1 枚占格棋子；隐藏预部署与正式部署统一约束）
 TUNING.WANG.PIECE_GRID_SIZE = 2            -- 网格边长（地皮）：部署占用分区
 TUNING.WANG.PIECE_GRID_SNAP = false        -- 部署自动吸附格中心（默认关：落点即落点，格内自由偏移）
-TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT = 3  -- 空占位超时（秒），由 TheWorld 自动解锁
 
 -- 天下劫（三技能）：地图上的部署棋子按 20 单位固定世界网格聚合为长期选点。
 -- 固定网格保证增减棋子/读档时聚合坐标不会随成员平均位置漂移。

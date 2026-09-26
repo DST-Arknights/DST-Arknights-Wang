@@ -257,7 +257,8 @@ local function SnapLianxingTargetToCell(_, pos)
   if pos == nil then
     return nil
   end
-  local x, z = Grid:CellCenterAt(pos.x, pos.z)
+  local gx, gz = Grid:WorldToCell(pos.x, pos.z)
+  local x, z = Grid:CellCenter(gx, gz)
   return Vector3(x, 0, z)
 end
 
@@ -315,13 +316,11 @@ RegisterTargetSelector("wang_skill3_map", MapTargetSelector {
 -- 四个固定槽位位于 3 倍方格的四角：西北 → 东北 → 东南 → 西南，顺时针排列。
 -- 每个槽位可复用目标格周围 3×3 九格内最近的已有棋子，避免围栏过于拥挤；同一棋子只复用一次。
 -- 没有可复用棋子时才在对应角落目标格落新子。
-local function FindReusableLianxingPiece(x, z, usedPieces)
-  local gx, gz = Grid:CellCoord(x, z)
-  local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
+local function FindReusableLianxingPiece(gx, gz, x, z, usedPieces)
   local closest, closestDistSq
   for dx = -1, 1 do
     for dz = -1, 1 do
-      local piece = Grid:GetPieceAt((gx + dx + 0.5) * grid, (gz + dz + 0.5) * grid)
+      local piece = Grid:GetPiece(gx + dx, gz + dz)
       if piece ~= nil and not usedPieces[piece] then
         local px, _, pz = piece.Transform:GetWorldPosition()
         local distSq = (px - x) * (px - x) + (pz - z) * (pz - z)
@@ -343,13 +342,14 @@ local function BuildLianxingRing(cx, cz)
     local x = cx + offset[1] * WANG_SKILL2_HALF_SIZE
     local z = cz + offset[2] * WANG_SKILL2_HALF_SIZE
     -- 施法中心本身已吸附格中心；±6 恰为 3 个棋子网格，四角天然仍落在格中心。
-    x, z = Grid:CellCenterAt(x, z)
+    local gx, gz = Grid:WorldToCell(x, z)
+    x, z = Grid:CellCenter(gx, gz)
 
-    local piece = FindReusableLianxingPiece(x, z, usedPieces)
+    local piece = FindReusableLianxingPiece(gx, gz, x, z, usedPieces)
     if piece ~= nil then
       usedPieces[piece] = true
       table.insert(slots, { index = index, x = x, z = z, piece = piece })
-    elseif Grid:IsCellTaken(x, z) or not TheWorld.Map:IsPassableAtPoint(x, 0, z) then
+    elseif Grid:IsOccupied(gx, gz) or not TheWorld.Map:IsPassableAtPoint(x, 0, z) then
       return nil, 0, 'WANG_SKILL2_NO_LINK'
     else
       table.insert(slots, { index = index, x = x, z = z })
@@ -401,7 +401,7 @@ local function FinishLianxing(slots, cx, cz, doer)
   ArkLogger:Debug(string.format("连星：方格四角(%.1f,%.1f) 成环 %d/%d 条", cx, cz, linked, WANG_SKILL2_RING_COUNT))
 end
 
--- 先为全部缺失槽位统一占位，再一次性消耗棋子，保证不会出现资源不足时的部分落子。
+-- 先为全部缺失槽位生成隐藏棋子并声明占格，再一次性消耗棋子，保证不会出现资源不足时的部分落子。
 local function ScheduleLianxingRing(doer, cx, cz)
   local slots, missing, reason = BuildLianxingRing(cx, cz)
   if slots == nil then
@@ -419,10 +419,8 @@ local function ScheduleLianxingRing(doer, cx, cz)
       piece._eliteBonusDamage = GetEliteBonusDamage(doer)
       piece._deployer = doer
       piece._deployerUserid = doer.userid
-      piece.persists = false
       piece.Transform:SetPosition(slot.x, 0, slot.z)
-      piece:Hide()
-      if not Grid:TryOccupy(slot.x, slot.z) then
+      if not piece:ReserveDeployCell() then
         piece:Remove()
         for _, pendingSlot in ipairs(pending) do
           if pendingSlot.piece:IsValid() then
@@ -431,7 +429,6 @@ local function ScheduleLianxingRing(doer, cx, cz)
         end
         return false, 'WANG_SKILL2_NO_LINK'
       end
-      piece._wang_gridX, piece._wang_gridZ = slot.x, slot.z
       slot.piece = piece
       table.insert(pending, slot)
     end
@@ -456,8 +453,6 @@ local function ScheduleLianxingRing(doer, cx, cz)
   for _, slot in ipairs(pending) do
     TheWorld:DoTaskInTime((slot.index - 1) * interval, function()
       if slot.piece:IsValid() then
-        slot.piece.persists = true
-        slot.piece:Show()
         if not slot.piece:DeployPiece({ playappear = true }) then
           slot.piece = nil -- 留作可拾取棋子，不参与本次连星。
         end
@@ -919,15 +914,15 @@ end
 local function OnWangSkill3ManualDeploy(inst, data)
   local skill = inst.components.ark_skill:GetSkill("wang_skill3")
   local levelParams = skill:GetLevelParams()
-  local gx, gz = Grid:CellCoord(data.x, data.z)
-  local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
+  local gx, gz = Grid:WorldToCell(data.x, data.z)
   local pending = {}
   local bulletLimit = math.min(#WANG_SKILL3_DIRECTIONS, skill.data.bulletCount)
   for index = 1, bulletLimit do
     local direction = WANG_SKILL3_DIRECTIONS[index]
-    local x = (gx + direction[1] + 0.5) * grid
-    local z = (gz + direction[2] + 0.5) * grid
-    if not Grid:IsCellTaken(x, z) and TheWorld.Map:IsPassableAtPoint(x, 0, z) then
+    local cellX = gx + direction[1]
+    local cellZ = gz + direction[2]
+    local x, z = Grid:CellCenter(cellX, cellZ)
+    if not Grid:IsOccupied(cellX, cellZ) and TheWorld.Map:IsPassableAtPoint(x, 0, z) then
       local piece = SpawnPrefab("piece")
       piece._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
       piece._eliteBonusDamage = GetEliteBonusDamage(inst)
@@ -936,11 +931,8 @@ local function OnWangSkill3ManualDeploy(inst, data)
       piece._neighborMode = "square"
       piece._deployer = inst
       piece._deployerUserid = inst.userid
-      piece.persists = false
       piece.Transform:SetPosition(x, 0, z)
-      piece:Hide()
-      if Grid:TryOccupy(x, z) then
-        piece._wang_gridX, piece._wang_gridZ = x, z
+      if piece:ReserveDeployCell() then
         table.insert(pending, { piece = piece, x = x, z = z })
       else
         piece:Remove()
@@ -957,10 +949,7 @@ local function OnWangSkill3ManualDeploy(inst, data)
   for index, entry in ipairs(pending) do
     entry.piece:DoTaskInTime((index - 1) * WANG_SKILL3_AUTO_INTERVAL, function()
       if entry.piece:IsValid() then
-        local piece = entry.piece
-        piece.persists = true
-        piece:Show()
-        piece:DeployPiece({ playappear = true })
+        entry.piece:DeployPiece({ playappear = true })
       end
     end)
   end

@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════
 -- 棋子投掷：服务端网格检查与起飞属性初始化
--- 客户端 CanTossInWorld 只做 UI 门禁（看不到飞行中的占位）；真正拦截在动作执行处。
--- 包一层原版 ACTIONS.TOSS.fn：黑子目标格被占/被占位 → 不投掷、棋子不消耗（仍留在手上/堆叠）。
+-- 主客机都维护本地网格缓存；客户端 CanTossInWorld O(1) 查询，服务端动作执行处再做权威检查。
+-- 包一层原版 ACTIONS.TOSS.fn：黑子目标格已有棋子实体 → 不投掷、棋子不消耗（仍留在手上/堆叠）。
 -- 仅对 prefab == "piece" 生效，水球/鞭炮等其它 TOSS 物品不受影响。
 -- ════════════════════════════════════════════════════════
 local WANG_GRID = require "wang_piecegrid"
@@ -33,8 +33,11 @@ ACTIONS.TOSS.fn = function(act)
     end
     if projectile ~= nil and projectile.prefab == "piece" then
       local pos = act:GetActionPoint()
-      if pos ~= nil and WANG_GRID:IsCellTaken(pos.x, pos.z) then
-        return false
+      if pos ~= nil then
+        local gx, gz = WANG_GRID:WorldToCell(pos.x, pos.z)
+        if WANG_GRID:IsOccupied(gx, gz) then
+          return false
+        end
       end
     end
   end

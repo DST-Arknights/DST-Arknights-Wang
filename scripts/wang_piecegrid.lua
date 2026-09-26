@@ -1,15 +1,12 @@
 -- ════════════════════════════════════════════════════════
--- 望棋子网格占用表（共享模块，主世界维护状态，客户端可查）
--- 整图按 TUNING.WANG.PIECE_GRID_SIZE（网格边长，默认 2）切成格子，
--- 每格至多一枚已部署棋子；占用位置在格内自由偏移（吸附开关控制是否居中）。
--- 投掷和延迟落子共用 TryOccupy → SetPiece → Release；SetPiece 可直接登记空格。
--- 正常流程按坐标完成设置或释放；TheWorld 超时只兜底未设置棋子的空占位。
--- 棋子移除后只记录时间，过期历史在下次访问时清理，不安排额外任务。
--- 读档由棋子重新登记；历史残留不占格，也不计入玩家部署数量。
+-- 望棋子网格缓存（主机 / 客机各自维护）
+-- 对外 API 一律使用网格坐标 (gx, gz)；CellKey 仅是内部 table 索引实现。
+-- 棋子先确定 Transform，再通过联网占格状态声明自己占格；主客机收到状态后登记同一枚实体。
+-- 动作采集器只查本地 cells，不做空间扫描。
+-- 棋子移除后的邻子加成残留独立记录，不属于占格。
 -- ════════════════════════════════════════════════════════
 
 local GRID_SIZE = (TUNING.WANG and TUNING.WANG.PIECE_GRID_SIZE) or 2
-local OCCUPANCY_TIMEOUT = (TUNING.WANG and TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT) or 3
 local NEIGHBOR_LINGER = TUNING.WANG.PIECE_NEIGHBOR_LINGER
 local NEIGHBOR_OFFSETS = {
   cross = {
@@ -22,147 +19,113 @@ local NEIGHBOR_OFFSETS = {
 }
 
 local Grid = {
-  cells = {}, -- key → { occupied, piece, task, removedAt }
+  cells = {},        -- key -> 当前占格的 piece 实体
+  pieceCells = {},   -- piece -> key，释放时不依赖实体当前位置
+  removedUntil = {}, -- key -> 已部署棋子移除后的邻子加成截止时间
 }
-
--- 格号（世界锚定：坐标/边长 向下取整；支持负坐标）
-local function CellCoord(x, z)
-  return math.floor(x / GRID_SIZE), math.floor(z / GRID_SIZE)
-end
 
 local function CellKey(gx, gz)
   return gx * 1048576 + gz
 end
 
-local function GetCell(self, key, now)
-  local cell = self.cells[key]
-  if cell ~= nil and not cell.occupied
-      and cell.removedAt ~= nil and now - cell.removedAt >= NEIGHBOR_LINGER then
+local function GetValidPiece(self, key)
+  local piece = self.cells[key]
+  if piece ~= nil and not piece:IsValid() then
     self.cells[key] = nil
-    return nil
+    self.pieceCells[piece] = nil
+    piece = nil
   end
-  return cell
+  return piece
 end
 
--- 世界坐标 → 格号
-function Grid:CellCoord(x, z)
-  return CellCoord(x, z)
+local function HasRemovedNeighbor(self, key, now)
+  local expires = self.removedUntil[key]
+  if expires == nil then
+    return false
+  end
+  if now >= expires then
+    self.removedUntil[key] = nil
+    return false
+  end
+  return true
 end
 
--- 格中心世界坐标（吸附用）
-function Grid:CellCenterAt(x, z)
-  local gx, gz = CellCoord(x, z)
+-- 世界坐标 -> 网格坐标。
+function Grid:WorldToCell(x, z)
+  return math.floor(x / GRID_SIZE), math.floor(z / GRID_SIZE)
+end
+
+-- 网格坐标 -> 格中心世界坐标。
+function Grid:CellCenter(gx, gz)
   return (gx + 0.5) * GRID_SIZE, (gz + 0.5) * GRID_SIZE
 end
 
--- 部署位置：吸附开关 ON → 格中心；OFF → 原样（自由偏移）
-function Grid:SnapPos(x, z)
-  if TUNING.WANG and TUNING.WANG.PIECE_GRID_SNAP then
-    return Grid:CellCenterAt(x, z)
+-- 世界坐标吸附；仅此接口同时接收/返回世界坐标。
+function Grid:SnapWorldPos(x, z)
+  if not (TUNING.WANG and TUNING.WANG.PIECE_GRID_SNAP) then
+    return x, z
   end
-  return x, z
+  local gx, gz = self:WorldToCell(x, z)
+  return self:CellCenter(gx, gz)
 end
 
--- 目标格是否被占用（已设置棋子或空占位）
-function Grid:IsCellTaken(x, z)
-  local cell = GetCell(self, CellKey(CellCoord(x, z)), GetTime())
-  return cell ~= nil and cell.occupied == true
+function Grid:GetPiece(gx, gz)
+  return GetValidPiece(self, CellKey(gx, gz))
 end
 
--- 取得目标格中的棋子；空占位不算已有棋子。
-function Grid:GetPieceAt(x, z)
-  local entry = GetCell(self, CellKey(CellCoord(x, z)), GetTime())
-  local piece = entry ~= nil and entry.piece or nil
-  return piece ~= nil and piece:IsValid() and piece or nil
+function Grid:IsOccupied(gx, gz)
+  return self:GetPiece(gx, gz) ~= nil
 end
 
-function Grid:CountNeighbors(x, z, neighborMode)
-  local gx, gz = CellCoord(x, z)
+function Grid:CountNeighbors(gx, gz, neighborMode)
   local now = GetTime()
   local count = 0
   for _, offset in ipairs(NEIGHBOR_OFFSETS[neighborMode or "cross"]) do
     local key = CellKey(gx + offset[1], gz + offset[2])
-    local entry = GetCell(self, key, now)
-    local piece = entry ~= nil and entry.piece or nil
-    local removedAt = entry ~= nil and entry.removedAt or nil
-    if (piece ~= nil and piece:IsValid()) or (removedAt ~= nil and now - removedAt < NEIGHBOR_LINGER) then
+    if GetValidPiece(self, key) ~= nil or HasRemovedNeighbor(self, key, now) then
       count = count + 1
     end
   end
   return count
 end
 
--- 动作采集器用的占用判断：主世界含占位（权威）；客户端空间查询近似（仅已落地棋子）
--- 客户端看不到占位（占位是服务端状态），权威拦截在动作执行处
-function Grid:IsCellTakenForAction(x, z)
-  if TheWorld.ismastersim then
-    return self:IsCellTaken(x, z)
-  end
-  local ents = TheSim:FindEntities(x, 0, z, 2 * GRID_SIZE, { "wang_piece_deployed" }, nil)
-  for _, p in ipairs(ents) do
-    local px, _, pz = p.Transform:GetWorldPosition()
-    if CellKey(CellCoord(px, pz)) == CellKey(CellCoord(x, z)) then
-      return true
-    end
-  end
-  return false
-end
-
--- 先占格，不依赖棋子实体；设置棋子后自动取消超时任务。
-function Grid:TryOccupy(x, z)
-  local key = CellKey(CellCoord(x, z))
-  local cell = GetCell(self, key, GetTime())
-  if cell ~= nil and cell.occupied then
+-- 登记真实棋子实体；同一实体重复登记幂等，目标格已有其它实体则失败。
+function Grid:Register(piece, gx, gz)
+  if piece == nil or not piece:IsValid() then
     return false
   end
 
-  cell = cell or {}
-  self.cells[key] = cell
-  cell.occupied = true
-  cell.task = TheWorld:DoTaskInTime(OCCUPANCY_TIMEOUT, function()
-    if cell.occupied and cell.piece == nil then
-      self:Release(x, z)
-    end
-  end)
+  local key = CellKey(gx, gz)
+  local current = GetValidPiece(self, key)
+  if current ~= nil and current ~= piece then
+    return false
+  end
+
+  local oldKey = self.pieceCells[piece]
+  if oldKey ~= nil and oldKey ~= key and self.cells[oldKey] == piece then
+    self.cells[oldKey] = nil
+  end
+
+  self.cells[key] = piece
+  self.pieceCells[piece] = key
+  self.removedUntil[key] = nil
   return true
 end
 
--- 填入已占位格子，也可直接登记空格；调用方负责前置占位检查。
-function Grid:SetPiece(x, z, piece)
-  local key = CellKey(CellCoord(x, z))
-  local cell = GetCell(self, key, GetTime())
-  if cell ~= nil and cell.piece ~= nil and cell.piece ~= piece then
+-- 通过反向表释放，不读取棋子当前位置；只有服务端已部署棋子移除时传 linger=true。
+function Grid:Unregister(piece, linger)
+  local key = self.pieceCells[piece]
+  if key == nil then
     return false
   end
 
-  cell = cell or {}
-  self.cells[key] = cell
-  if cell.task ~= nil then
-    cell.task:Cancel()
-    cell.task = nil
-  end
-  cell.occupied = true
-  cell.piece = piece
-  return true
-end
-
-function Grid:Release(x, z)
-  local key = CellKey(CellCoord(x, z))
-  local cell = self.cells[key]
-  if cell == nil or not cell.occupied then
-    return false
-  end
-  if cell.task ~= nil then
-    cell.task:Cancel()
-    cell.task = nil
-  end
-  if cell.piece ~= nil then
-    cell.removedAt = GetTime()
-  end
-  cell.piece = nil
-  cell.occupied = false
-  if cell.removedAt == nil then
+  if self.cells[key] == piece then
     self.cells[key] = nil
+  end
+  self.pieceCells[piece] = nil
+
+  if linger then
+    self.removedUntil[key] = GetTime() + NEIGHBOR_LINGER
   end
   return true
 end

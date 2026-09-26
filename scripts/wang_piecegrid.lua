@@ -5,14 +5,25 @@
 -- 投掷飞行期间对目标格打"占位"（ReserveCell），超时自动解锁，避免连续投掷堆叠。
 -- 占用数据挂在已部署棋子自身（SetDeployedState 注册 / onremove 释放），
 -- 读档恢复自动重新注册，无存档、无全图扫描。
--- 网格只约束"摆放"，不参与爆炸 / 取势 / 部署态陷阱逻辑。
+-- 网格同时供爆炸查询邻子加成；棋子移除后的短期残留不占格。
 -- ════════════════════════════════════════════════════════
 
 local GRID_SIZE = (TUNING.WANG and TUNING.WANG.PIECE_GRID_SIZE) or 2
 local PLACEHOLDER_TIMEOUT = (TUNING.WANG and TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT) or 3
+local NEIGHBOR_LINGER = TUNING.WANG.PIECE_NEIGHBOR_LINGER
+local NEIGHBOR_OFFSETS = {
+  cross = {
+    { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
+  },
+  square = {
+    { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
+    { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
+  },
+}
 
 local Grid = {
   cells = {}, -- key = gx*1048576+gz → { piece=已部署棋子 } 或 { reservation=飞行棋子, task=超时任务 }
+  removedUntil = {}, -- 已部署棋子移除后的加成截止时间，不影响占位。
 }
 
 -- 格号（世界锚定：坐标/边长 向下取整；支持负坐标）
@@ -53,6 +64,22 @@ function Grid:GetPieceAt(x, z)
   local entry = self.cells[CellKey(CellCoord(x, z))]
   local piece = entry ~= nil and entry.piece or nil
   return piece ~= nil and piece:IsValid() and piece or nil
+end
+
+function Grid:CountNeighbors(x, z, neighborMode)
+  local gx, gz = CellCoord(x, z)
+  local now = GetTime()
+  local count = 0
+  for _, offset in ipairs(NEIGHBOR_OFFSETS[neighborMode or "cross"]) do
+    local key = CellKey(gx + offset[1], gz + offset[2])
+    local entry = self.cells[key]
+    local piece = entry ~= nil and entry.piece or nil
+    local expires = self.removedUntil[key]
+    if (piece ~= nil and piece:IsValid()) or (expires ~= nil and now < expires) then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 -- 动作采集器用的占用判断：主世界含占位（权威）；客户端空间查询近似（仅已落地棋子）
@@ -121,6 +148,16 @@ function Grid:Detach(piece)
   piece._wang_gridKey = nil
   local e = self.cells[key]
   if e ~= nil and (e.piece == piece or e.reservation == piece) then
+    if e.piece == piece then
+      local expires = GetTime() + NEIGHBOR_LINGER
+      self.removedUntil[key] = expires
+      -- 挂在世界上，避免随棋子移除被取消；同格再次移除会延长残留。
+      TheWorld:DoTaskInTime(NEIGHBOR_LINGER, function()
+        if self.removedUntil[key] == expires then
+          self.removedUntil[key] = nil
+        end
+      end)
+    end
     if e.task ~= nil then
       e.task:Cancel()
       e.task = nil

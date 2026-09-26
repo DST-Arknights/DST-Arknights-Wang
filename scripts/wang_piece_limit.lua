@@ -21,7 +21,9 @@ function PieceLimit:GetLimit(deployer)
   return math.clamp(baseHealth - eliteHealth, 1, baseHealth - 1)
 end
 
-function PieceLimit:Register(piece, deployer)
+function PieceLimit:Register(piece)
+  local deployer = piece._deployer
+  piece._deployer = nil
   piece._deployTime = piece._deployTime or GetTime()
   if piece._deployOrder == nil then
     self.nextOrder = self.nextOrder + 1
@@ -29,10 +31,6 @@ function PieceLimit:Register(piece, deployer)
   else
     self.nextOrder = math.max(self.nextOrder, piece._deployOrder)
   end
-  if deployer ~= nil then
-    piece._deployerUserid = deployer.userid
-  end
-
   local userid = piece._deployerUserid
   if userid == nil then
     return

@@ -130,6 +130,13 @@ local function SpawnExplodeFx(inst, active, scale)
   SpawnFxAt("wang_piece_explode_shadow_fx", x, y, z, scale)
 end
 
+local function GetExplodeDamage(inst, multiplier)
+  local x, _, z = inst.Transform:GetWorldPosition()
+  local neighbors = Grid:CountNeighbors(x, z, inst._neighborMode)
+  return (inst._baseDamage + inst._eliteBonusDamage) * inst._damageMultiplier
+      * (1 + TUNING.WANG.PIECE_NEIGHBOR_DAMAGE_BONUS * neighbors) * (multiplier or 1)
+end
+
 -- ────────────────────────────────────────────────────────
 -- 部署态被动引爆：周期检测引爆半径内目标，命中即直接爆炸（陷阱）
 -- 参考蜜蜂地雷 mine 组件（DoPeriodicTask + FindEntity）
@@ -232,11 +239,11 @@ end
 -- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
 -- 网格注册统一走这里：投掷/拈子剑/连星/读档恢复 → 自动重建占用表
 -- ────────────────────────────────────────────────────────
-local function SetDeployedState(inst, deploydata)
+local function SetDeployedState(inst, options)
   if inst._isdeployed then
     return
   end
-  deploydata = deploydata or {}
+  options = options or {}
 
   inst._isdeployed = true
   inst.persists = true
@@ -245,15 +252,15 @@ local function SetDeployedState(inst, deploydata)
   DisableEntityCollisions(inst)
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(true)
-  if not deploydata.silent then
+  if not options.silent then
     Audio.PlayPiecePlace(inst)
   end
-  if deploydata.playappear then
+  if options.playappear then
     inst.AnimState:PlayAnimation("ChuXian", false)
     inst.AnimState:PushAnimation("WeiJiHuo", true)
   else
     inst.AnimState:PlayAnimation("WeiJiHuo", true)
-    if deploydata.randomize then
+    if options.randomize then
       RandomizeAnimFrame(inst)
     end
   end
@@ -270,7 +277,7 @@ local function SetDeployedState(inst, deploydata)
 
   -- 普通部署态即为陷阱态；连星会在 EnterLinkState 中关闭检测。
   StartProximityTrap(inst)
-  PieceLimit:Register(inst, deploydata.deployer)
+  PieceLimit:Register(inst)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -308,7 +315,7 @@ local function OnTossHit(inst, attacker)
   -- 特效遮盖黑子生成过程（同主动爆炸特效）
   SpawnExplodeFx(inst, true)
 
-  SetDeployedState(inst, { deployer = attacker })
+  inst:DeployPiece()
 end
 
 -- ────────────────────────────────────────────────────────
@@ -345,7 +352,8 @@ local function CanTossInWorld(_, _, pos)
   return not Grid:IsCellTakenForAction(pos.x, pos.z)
 end
 
-local function OnTossLaunch(inst, _, targetPos)
+local function OnTossLaunch(inst, attacker, targetPos)
+  inst:PushEvent("wang_piece_toss_launch", { deployer = attacker })
   inst.AnimState:PlayAnimation("XuanZuan", true)
   Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
   Grid:ReserveCell(inst, targetPos.x, targetPos.z)
@@ -359,21 +367,16 @@ local function OnRemove(inst)
 end
 
 local function OnSave(inst, data)
-  if inst._isdeployed then
-    data.isdeployed = true
-    data.deployer_userid = inst._deployerUserid
-    data.deployed_age = GetTime() - inst._deployTime
-    data.deployment_order = inst._deployOrder
-  end
-  if inst._islinked then
-    data.islinked = true
-  end
-  if inst._damageMultiplier ~= 1 then
-    data.damageMultiplier = inst._damageMultiplier
-  end
-  if inst._explodeRangeMultiplier ~= 1 then
-    data.explodeRangeMultiplier = inst._explodeRangeMultiplier
-  end
+  data.baseDamage = inst._baseDamage
+  data.eliteBonusDamage = inst._eliteBonusDamage
+  data.damageMultiplier = inst._damageMultiplier
+  data.explodeRangeMultiplier = inst._explodeRangeMultiplier
+  data.neighborMode = inst._neighborMode
+  data.deployer_userid = inst._deployerUserid
+  data.deployed_age = inst._deployTime ~= nil and (GetTime() - inst._deployTime) or nil
+  data.deployment_order = inst._deployOrder
+  data.isdeployed = inst._isdeployed
+  data.islinked = inst._islinked
 end
 
 local function OnLoad(inst, data)
@@ -381,13 +384,16 @@ local function OnLoad(inst, data)
     return
   end
 
+  inst._baseDamage = data.baseDamage or TUNING.WANG.PIECE_BASE_DAMAGE
+  inst._eliteBonusDamage = data.eliteBonusDamage or 0
   inst._damageMultiplier = data.damageMultiplier or 1
   inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
+  inst._neighborMode = data.neighborMode or "cross"
+  inst._deployerUserid = data.deployer_userid
+  inst._deployTime = data.deployed_age ~= nil and (GetTime() - data.deployed_age) or nil
+  inst._deployOrder = data.deployment_order
 
   if data.isdeployed then
-    inst._deployerUserid = data.deployer_userid
-    inst._deployTime = data.deployed_age ~= nil and (GetTime() - data.deployed_age) or nil
-    inst._deployOrder = data.deployment_order
     SetDeployedState(inst, { silent = true, randomize = true })
   end
   if data.islinked then
@@ -502,16 +508,18 @@ local function fn()
   -- 引爆方法（挂在棋子实例上，仅部署态有效）
   -- ────────────────────────────────────────────────────────
 
-  -- 棋子基础伤害（内置，便于不同品质/类型扩展）
+  -- 外部生成后直接设置属性；属性与部署/连接状态分别存档。
   inst._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+  inst._eliteBonusDamage = 0
   inst._damageMultiplier = 1
   inst._explodeRangeMultiplier = 1
+  inst._neighborMode = "cross"
 
   -- 主动引爆（1技能取势调用）：范围伤害 + 摧毁周围建造物 + 双特效
-  -- multiplier: 技能倍率（如 0.9 / 1.1 / 1.3），实际伤害 = 基础伤害 × 倍率
+  -- multiplier: 引爆时的额外倍率，与部署倍率及邻子加成相乘。
   inst.ActiveExplode = function(_, source, multiplier, sfx_volume)
     if not inst._isdeployed then return end
-    local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
+    local damage = GetExplodeDamage(inst, multiplier)
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, source, damage, range, true)
     SpawnExplodeFx(inst, true, inst._explodeRangeMultiplier)
@@ -523,7 +531,7 @@ local function fn()
   -- multiplier: 倍率，默认 1（被动引爆无技能加成）
   inst.PassiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end
-    local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
+    local damage = GetExplodeDamage(inst, multiplier)
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, inst, damage, range, false, source)
     SpawnExplodeFx(inst, false, inst._explodeRangeMultiplier)
@@ -542,17 +550,8 @@ local function fn()
     StopProximityTrap(inst)
   end
 
-  -- 落子部署（拈子剑 / 连星复用）：调用方先设置 Transform，再进入部署态
-  -- deploydata.playappear=true 时先播 ChuXian，再转 WeiJiHuo
-  -- deploydata.deployer 指定归属玩家；仅正式部署计入该玩家上限。
-  -- 仅主世界可调用
-  inst.DeployPiece = function(_, deploydata)
-    if inst._isdeployed then return end
-    deploydata = deploydata or {}
-    inst._damageMultiplier = deploydata.damageMultiplier or 1
-    inst._explodeRangeMultiplier = deploydata.explodeRangeMultiplier or 1
-    SetDeployedState(inst, deploydata)
-  end
+  -- 属性和 Transform 由外部先设好；这里只切换部署态，选项仅控制表现。
+  inst.DeployPiece = SetDeployedState
 
   return inst
 end

@@ -91,6 +91,9 @@ TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
 TUNING.WANG.PIECE_BASE_DAMAGE = 10    -- 爆炸基础伤害（主动 / 被动引爆）
 TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
 TUNING.WANG.PIECE_DEFAULT_LIMIT = 20 -- 无精英组件的玩家部署上限
+TUNING.WANG.PIECE_ELITE_DAMAGE_PER_LEVEL = 0.2 -- 部署时每累计精英等级增加的基础伤害
+TUNING.WANG.PIECE_NEIGHBOR_DAMAGE_BONUS = 0.25 -- 每个有效邻格的伤害加成
+TUNING.WANG.PIECE_NEIGHBOR_LINGER = 2         -- 棋子消失后邻格加成保留时间（秒）
 
 -- 连星（二技能）：棋子连接
 TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数

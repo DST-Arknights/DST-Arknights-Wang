@@ -8,6 +8,7 @@
 -- ════════════════════════════════════════════════════════
 local Grid = require "wang_piecegrid"
 local PieceResource = require "wang_piece_resource"
+local GetEliteBonusDamage = require "wang_piece_damage"
 
 -- 落子 action：fn 从 act:GetActionPoint() 读取目标地面点，消耗黑子并部署棋子
 AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
@@ -29,22 +30,26 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   end
   local skill = doer.components.ark_skill ~= nil
       and doer.components.ark_skill:GetSkill("wang_skill3") or nil
+  local skill3Active = skill ~= nil and skill:IsActivating()
   local sx, sz
-  if skill ~= nil and skill:IsActivating() then
+  if skill3Active then
     sx, sz = Grid:CellCenterAt(pos.x, pos.z)
   else
     sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
   end
-  local deploydata = { playappear = true, deployer = doer }
-  if skill ~= nil and skill:IsActivating() then
-    deploydata.silent = true
-    deploydata.damageMultiplier = 2
-    deploydata.explodeRangeMultiplier = 2
-  end
   local piece = SpawnPrefab("piece")
+  piece._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+  piece._eliteBonusDamage = GetEliteBonusDamage(doer)
+  piece._deployer = doer
+  piece._deployerUserid = doer.userid
+  if skill3Active then
+    piece._damageMultiplier = 2
+    piece._explodeRangeMultiplier = 2
+    piece._neighborMode = "square"
+  end
   piece.Transform:SetPosition(sx, pos.y, sz)
-  piece:DeployPiece(deploydata)
-  if skill ~= nil and skill:IsActivating() then
+  piece:DeployPiece({ playappear = true, silent = skill3Active })
+  if skill3Active then
     doer:PushEvent("wang_skill3_manual_deploy", { x = sx, y = pos.y, z = sz })
   end
   return true

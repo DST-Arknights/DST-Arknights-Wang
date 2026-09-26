@@ -6,6 +6,7 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 local ARK_CONSTANTS = require("ark_constants")
 local Grid = require("wang_piecegrid")
 local PieceResource = require("wang_piece_resource")
+local GetEliteBonusDamage = require("wang_piece_damage")
 local Skill3MapMarkers = require("wang_skill3_mapmarkers")
 local Audio = require("wang_audio")
 
@@ -414,6 +415,10 @@ local function ScheduleLianxingRing(doer, cx, cz)
   for _, slot in ipairs(slots) do
     if slot.piece == nil then
       local piece = SpawnPrefab("piece")
+      piece._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+      piece._eliteBonusDamage = GetEliteBonusDamage(doer)
+      piece._deployer = doer
+      piece._deployerUserid = doer.userid
       piece.persists = false
       piece.Transform:SetPosition(slot.x, 0, slot.z)
       piece:Hide()
@@ -452,7 +457,7 @@ local function ScheduleLianxingRing(doer, cx, cz)
       if slot.piece:IsValid() then
         slot.piece.persists = true
         slot.piece:Show()
-        slot.piece:DeployPiece({ playappear = true, deployer = doer })
+        slot.piece:DeployPiece({ playappear = true })
       end
       remaining = remaining - 1
       if remaining == 0 then
@@ -921,6 +926,13 @@ local function OnWangSkill3ManualDeploy(inst, data)
     local z = (gz + direction[2] + 0.5) * grid
     if not Grid:IsCellTaken(x, z) and TheWorld.Map:IsPassableAtPoint(x, 0, z) then
       local piece = SpawnPrefab("piece")
+      piece._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+      piece._eliteBonusDamage = GetEliteBonusDamage(inst)
+      piece._damageMultiplier = levelParams.damageMultiplier
+      piece._explodeRangeMultiplier = levelParams.explodeRangeMultiplier
+      piece._neighborMode = "square"
+      piece._deployer = inst
+      piece._deployerUserid = inst.userid
       piece.persists = false
       piece.Transform:SetPosition(x, 0, z)
       piece:Hide()
@@ -943,12 +955,7 @@ local function OnWangSkill3ManualDeploy(inst, data)
       if entry.piece:IsValid() then
         local piece = entry.piece
         piece:Show()
-        piece:DeployPiece({
-          playappear = true,
-          deployer = inst,
-          damageMultiplier = levelParams.damageMultiplier,
-          explodeRangeMultiplier = levelParams.explodeRangeMultiplier,
-        })
+        piece:DeployPiece({ playappear = true })
       end
     end)
   end

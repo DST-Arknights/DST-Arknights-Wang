@@ -601,6 +601,10 @@ end
 
 local function RestoreSkill3Player(inst, was_invincible)
   inst._wang_skill3_airborne = nil
+  if inst._wang_skill3_added_notarget then
+    inst:RemoveTag("notarget")
+    inst._wang_skill3_added_notarget = nil
+  end
   StopSkill3InvincibilityGuard(inst)
   if inst.components.talker ~= nil then
     inst.components.talker:StopIgnoringAll("wang_skill3")
@@ -673,6 +677,11 @@ AddStategraphState("wilson", State {
 
 local function EnterSkill3Airborne(inst, targetpos, own_flight)
   inst._wang_skill3_airborne = true
+  -- notarget 会被原版战斗和爆炸查找排除，且不会随下棋时切换 SG 状态丢失。
+  if not inst:HasTag("notarget") then
+    inst:AddTag("notarget")
+    inst._wang_skill3_added_notarget = true
+  end
   inst.components.locomotor:SetExternalSpeedMultiplier(inst, WANG_SKILL3_SPEED_KEY, 0)
   inst.components.locomotor:Stop()
 

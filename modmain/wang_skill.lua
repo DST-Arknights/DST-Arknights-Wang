@@ -422,7 +422,7 @@ local function ScheduleLianxingRing(doer, cx, cz)
       piece.persists = false
       piece.Transform:SetPosition(slot.x, 0, slot.z)
       piece:Hide()
-      if not Grid:ReserveCell(piece, slot.x, slot.z) then
+      if not Grid:TryOccupy(slot.x, slot.z) then
         piece:Remove()
         for _, pendingSlot in ipairs(pending) do
           if pendingSlot.piece:IsValid() then
@@ -431,6 +431,7 @@ local function ScheduleLianxingRing(doer, cx, cz)
         end
         return false, 'WANG_SKILL2_NO_LINK'
       end
+      piece._wang_gridX, piece._wang_gridZ = slot.x, slot.z
       slot.piece = piece
       table.insert(pending, slot)
     end
@@ -457,7 +458,9 @@ local function ScheduleLianxingRing(doer, cx, cz)
       if slot.piece:IsValid() then
         slot.piece.persists = true
         slot.piece:Show()
-        slot.piece:DeployPiece({ playappear = true })
+        if not slot.piece:DeployPiece({ playappear = true }) then
+          slot.piece = nil -- 留作可拾取棋子，不参与本次连星。
+        end
       end
       remaining = remaining - 1
       if remaining == 0 then
@@ -936,7 +939,8 @@ local function OnWangSkill3ManualDeploy(inst, data)
       piece.persists = false
       piece.Transform:SetPosition(x, 0, z)
       piece:Hide()
-      if Grid:ReserveCell(piece, x, z) then
+      if Grid:TryOccupy(x, z) then
+        piece._wang_gridX, piece._wang_gridZ = x, z
         table.insert(pending, { piece = piece, x = x, z = z })
       else
         piece:Remove()
@@ -951,9 +955,10 @@ local function OnWangSkill3ManualDeploy(inst, data)
   end
   skill:CutBullet(#pending)
   for index, entry in ipairs(pending) do
-    inst:DoTaskInTime((index - 1) * WANG_SKILL3_AUTO_INTERVAL, function()
+    entry.piece:DoTaskInTime((index - 1) * WANG_SKILL3_AUTO_INTERVAL, function()
       if entry.piece:IsValid() then
         local piece = entry.piece
+        piece.persists = true
         piece:Show()
         piece:DeployPiece({ playappear = true })
       end

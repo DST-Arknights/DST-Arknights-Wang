@@ -48,7 +48,9 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
     piece._neighborMode = "square"
   end
   piece.Transform:SetPosition(sx, pos.y, sz)
-  piece:DeployPiece({ playappear = true, silent = skill3Active })
+  if not piece:DeployPiece({ playappear = true, silent = skill3Active }) then
+    return false, "CELL_OCCUPIED"
+  end
   if skill3Active then
     doer:PushEvent("wang_skill3_manual_deploy", { x = sx, y = pos.y, z = sz })
   end

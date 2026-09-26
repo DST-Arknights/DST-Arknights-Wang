@@ -15,7 +15,7 @@ local Skill3MapMarkers = require "wang_skill3_mapmarkers"
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
 --           遮盖黑子出现，直接播放未激活动画(WeiJiHuo)
 -- 网格约束：落点所在格已被占/被占位 → 不投掷（服务端拦截）；飞行漂移落入已占格 → 落地为可拾取物品
--- 占位：投掷起飞即打目标格占位（ReserveCell），超时自动解锁，避免连续投掷堆叠
+-- 占位：投掷起飞即尝试占目标格（TryOccupy），超时自动解锁，避免连续投掷堆叠
 -- 引爆：主动(1技能) / 被动(被摧毁 / 部署态接近探测命中) 三种触发，参考火药爆炸 / 蜜蜂地雷
 -- 动画来源: animSource/piece/piece.scml
 --   idle     — 物品态（普通物品丢地上的表现）
@@ -239,10 +239,22 @@ end
 -- 无实体碰撞（棋子出生即不参与实体碰撞，部署时无需再移除碰撞体）
 -- 网格注册统一走这里：投掷/拈子剑/连星/读档恢复 → 自动重建占用表
 -- ────────────────────────────────────────────────────────
+local function ReleaseGridCell(inst)
+  if inst._wang_gridX ~= nil then
+    Grid:Release(inst._wang_gridX, inst._wang_gridZ)
+    inst._wang_gridX, inst._wang_gridZ = nil, nil
+  end
+end
+
 local function SetDeployedState(inst, options)
   if inst._isdeployed then
-    return
+    return true
   end
+  local x, _, z = inst.Transform:GetWorldPosition()
+  if not Grid:SetPiece(x, z, inst) then
+    return false
+  end
+  inst._wang_gridX, inst._wang_gridZ = x, z
   options = options or {}
 
   inst._isdeployed = true
@@ -266,18 +278,12 @@ local function SetDeployedState(inst, options)
   end
   EnableGroundFx(inst)
 
-  -- 注册网格占用（异常路径兜底：正常部署前调用方已查 IsCellTaken）
-  if TheWorld.ismastersim then
-    local x, _, z = inst.Transform:GetWorldPosition()
-    if not Grid:TryOccupy(x, z, inst) then
-      ArkLogger:Debug("棋子部署但所在格已被占用（异常路径）")
-    end
-    Skill3MapMarkers:Register(inst)
-  end
+  Skill3MapMarkers:Register(inst)
 
   -- 普通部署态即为陷阱态；连星会在 EnterLinkState 中关闭检测。
   StartProximityTrap(inst)
   PieceLimit:Register(inst)
+  return true
 end
 
 -- ────────────────────────────────────────────────────────
@@ -297,25 +303,17 @@ local function OnTossHit(inst, attacker)
     end
   end
 
-  -- 网格：清起飞时打的占位 → 落点（吸附可选）查占用 → 被占则不部署
-  if TheWorld.ismastersim then
-    Grid:Detach(inst)
-    local sx, sz = Grid:SnapPos(x, z) -- 吸附 ON → 格中心
-    if sx ~= x or sz ~= z then
-      inst.Transform:SetPosition(sx, y, sz)
-      x, z = sx, sz
-    end
-    if Grid:IsCellTaken(x, z) then
-      -- 落点格被占：恢复物品态待机动画（投掷飞行中播的是 XuanZuan 旋转）
-      inst.AnimState:PlayAnimation("idle", true)
-      return -- 保持物品态，可直接拾取回收
-    end
+  -- 释放起飞时的占位，再按实际落点登记；漂移冲突时保留为可拾取物品。
+  ReleaseGridCell(inst)
+  local sx, sz = Grid:SnapPos(x, z)
+  inst.Transform:SetPosition(sx, y, sz)
+  if Grid:IsCellTaken(sx, sz) or not inst:DeployPiece() then
+    inst.AnimState:PlayAnimation("idle", true)
+    return
   end
 
   -- 特效遮盖黑子生成过程（同主动爆炸特效）
   SpawnExplodeFx(inst, true)
-
-  inst:DeployPiece()
 end
 
 -- ────────────────────────────────────────────────────────
@@ -356,13 +354,15 @@ local function OnTossLaunch(inst, attacker, targetPos)
   inst:PushEvent("wang_piece_toss_launch", { deployer = attacker })
   inst.AnimState:PlayAnimation("XuanZuan", true)
   Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
-  Grid:ReserveCell(inst, targetPos.x, targetPos.z)
+  if Grid:TryOccupy(targetPos.x, targetPos.z) then
+    inst._wang_gridX, inst._wang_gridZ = targetPos.x, targetPos.z
+  end
 end
 
 local function OnRemove(inst)
   StopProximityTrap(inst)
   Skill3MapMarkers:Unregister(inst)
-  Grid:Detach(inst)
+  ReleaseGridCell(inst)
   PieceLimit:Unregister(inst)
 end
 

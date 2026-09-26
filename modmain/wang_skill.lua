@@ -224,21 +224,38 @@ local function OnWangSkill1Activate(skill, data)
 end
 
 -- ════════════════════════════════════════════════════════
--- 连星（技能2）：外围八子顺时针落下并首尾成环
--- 链路：选择器确认 → 检查外围 8 个指定位置 → 复用已有棋子 / 补足缺子 → 0.5 秒内顺时针落下 → 按环序直连
+-- 连星（技能2）：方格四角顺时针落子并首尾成环
+-- 链路：选择器确认 → 检查方格四角 → 复用已有棋子 / 补足缺子 → 0.5 秒内顺时针落下 → 按环序直连
 -- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
 -- ════════════════════════════════════════════════════════
-local WANG_SKILL2_AOE_RANGE = 6     -- 外围八子距离施法中心的半径
+local WANG_SKILL2_HALF_SIZE = 6     -- grid_1 放大 3 倍后：中心到四角目标格在 X/Z 轴上的偏移
 local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
 local WANG_SKILL2_DROP_WINDOW = 0.5 -- 缺失棋子在此时间内按顺时针顺序全部落下
-local WANG_SKILL2_RING_COUNT = 8
+local WANG_SKILL2_CORNER_OFFSETS = {
+  { -1,  1 }, -- 西北
+  {  1,  1 }, -- 东北
+  {  1, -1 }, -- 东南
+  { -1, -1 }, -- 西南
+}
+local WANG_SKILL2_RING_COUNT = #WANG_SKILL2_CORNER_OFFSETS
 
--- 连星区域选择器（同取势视觉：reticuleaoe 环 + 落点 ping）
+-- 连星区域选择器：物品包 grid_1 方格指示器放大 3 倍，落点按棋子单元格中心离散吸附。
+local function SnapLianxingTargetToCell(_, pos)
+  if pos == nil then
+    return nil
+  end
+  local x, z = Grid:CellCenterAt(pos.x, pos.z)
+  return Vector3(x, 0, z)
+end
+
 RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
   range          = WANG_SKILL2_CAST_RANGE,
   deployradius   = 0,
-  reticuleprefab = "reticuleaoe_6",
+  reticuleprefab = "ark_reticule_grid_1",
   pingprefab     = "reticuleaoeping_6",
+  reticulescale  = 3,
+  targetposfn    = SnapLianxingTargetToCell,
+  ease           = false, -- 固定格点不要在相邻单元格之间平滑滑动
 })
 
 -- 天下劫地图选择：已部署棋子由 wang_skill3_mapmarkers 按固定世界网格聚合。
@@ -282,9 +299,9 @@ RegisterTargetSelector("wang_skill3_map", MapTargetSelector {
   },
 })
 
--- 外围 8 个固定槽位：从正北开始，每 45° 一个，顺时针排列。
+-- 四个固定槽位位于 3 倍方格的四角：西北 → 东北 → 东南 → 西南，顺时针排列。
 -- 每个槽位可复用目标格周围 3×3 九格内最近的已有棋子，避免围栏过于拥挤；同一棋子只复用一次。
--- 没有可复用棋子时才在原固定槽位落新子。
+-- 没有可复用棋子时才在对应角落目标格落新子。
 local function FindReusableLianxingPiece(x, z, usedPieces)
   local gx, gz = Grid:CellCoord(x, z)
   local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
@@ -309,11 +326,11 @@ local function BuildLianxingRing(cx, cz)
   local slots = {}
   local missing = 0
   local usedPieces = {}
-  for index = 1, WANG_SKILL2_RING_COUNT do
-    local angle = (index - 1) * 2 * math.pi / WANG_SKILL2_RING_COUNT
-    local x = cx + math.sin(angle) * WANG_SKILL2_AOE_RANGE
-    local z = cz + math.cos(angle) * WANG_SKILL2_AOE_RANGE
-    x, z = Grid:SnapPos(x, z)
+  for index, offset in ipairs(WANG_SKILL2_CORNER_OFFSETS) do
+    local x = cx + offset[1] * WANG_SKILL2_HALF_SIZE
+    local z = cz + offset[2] * WANG_SKILL2_HALF_SIZE
+    -- 施法中心本身已吸附格中心；±6 恰为 3 个棋子网格，四角天然仍落在格中心。
+    x, z = Grid:CellCenterAt(x, z)
 
     local piece = FindReusableLianxingPiece(x, z, usedPieces)
     if piece ~= nil then
@@ -367,11 +384,8 @@ end
 
 local function FinishLianxing(slots, cx, cz, doer)
   local linked = LinkLianxingRing(slots)
-  if doer ~= nil and doer:IsValid() then
-    Audio.PlaySfx(doer, "skill2_area_explode", 0.6)
-    Audio.PlaySfx(doer, "piece_place", 0.35)
-  end
-  ArkLogger:Debug(string.format("连星：外围八子(%.1f,%.1f) 成环 %d/8 条", cx, cz, linked))
+  -- 暂停成环瞬时 SFX，用于确认聒噪声是否来自 skill2_area_explode；持续 linked_lp 保留。
+  ArkLogger:Debug(string.format("连星：方格四角(%.1f,%.1f) 成环 %d/%d 条", cx, cz, linked, WANG_SKILL2_RING_COUNT))
 end
 
 -- 先为全部缺失槽位统一占位，再一次性消耗棋子，保证不会出现资源不足时的部分落子。
@@ -440,7 +454,7 @@ end
 -- ════════════════════════════════════════════════════════
 -- 连星 Action + sg（同取势：走施法动画后排程落子+连接）
 -- 链路：技能激活 → PushBufferedAction → sg:wang_lianxing_piece 播投掷动画
---       → Frame 7 PerformBufferedAction → 0.5 秒内顺时针补齐外围八子 → 首尾成环
+--       → Frame 7 PerformBufferedAction → 0.5 秒内顺时针补齐方格四角 → 首尾成环
 -- 动画来源 player_actions_deploytoss.zip（player_common 已加载）
 -- ════════════════════════════════════════════════════════
 
@@ -496,7 +510,7 @@ AddStategraphState("wilson_client", wangLianxingState)
 AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 
--- 技能2激活测试（连星）：外围固定 8 个槽位，每槽可复用周围九格内已有棋子，只要求库存能补齐缺口。
+-- 技能2激活测试（连星）：方格四角固定 4 个槽位，每槽可复用周围九格内已有棋子，只要求库存能补齐缺口。
 local function OnWangSkill2ActivateTest(skill, params)
   if params == nil or params.targetPos == nil then
     return false, 'WANG_SKILL2_NO_LINK'
@@ -514,7 +528,7 @@ local function OnWangSkill2ActivateTest(skill, params)
   return true
 end
 
--- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 顺时针补齐外围八子并成环
+-- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 顺时针补齐方格四角并成环
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
@@ -530,7 +544,7 @@ local function OnWangSkill2Activate(skill, data)
   Audio.TrySayVoice(inst, "WANG_SKILL2_CAST")
   Audio.PlaySfx(inst, "skill2_select", 0.7)
 
-  ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入外围八子施法动画", pos.x, pos.z))
+  ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入方格四角施法动画", pos.x, pos.z))
 
   return true
 end

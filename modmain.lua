@@ -93,10 +93,9 @@ TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
 
 -- 连星（二技能）：棋子连接
 TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数
-TUNING.WANG.PIECE_LINK_RANGE = 1.9     -- 连接搜索半径（当前按选区直连未强制，预留）
 
 -- 棋子网格（全地图分区，每格至多 1 枚已部署棋子；投掷/拈子剑/连星统一约束）
-TUNING.WANG.PIECE_GRID_SIZE = 2            -- 网格边长（地皮）：占用分区 + 连星填充共用
+TUNING.WANG.PIECE_GRID_SIZE = 2            -- 网格边长（地皮）：部署占用分区
 TUNING.WANG.PIECE_GRID_SNAP = false        -- 部署自动吸附格中心（默认关：落点即落点，格内自由偏移）
 TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT = 3  -- 投掷占位超时（秒），超时自动解锁格子
 

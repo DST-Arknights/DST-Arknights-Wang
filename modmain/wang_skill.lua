@@ -224,14 +224,14 @@ local function OnWangSkill1Activate(skill, data)
 end
 
 -- ════════════════════════════════════════════════════════
--- 连星（技能2）：选区填充 + 棋子互连
--- 链路：选择器确认 → OnActivate → ①预留网格并在 0.5 秒内随机落子 → ②全选区转连接态 → ③邻格互连
+-- 连星（技能2）：外围八子顺时针落下并首尾成环
+-- 链路：选择器确认 → 检查外围 8 个指定位置 → 复用已有棋子 / 补足缺子 → 0.5 秒内顺时针落下 → 按环序直连
 -- 连接复用原版 electricconnector + piece_link_field 光束（连接/读档重连内置）
--- ③互连规则：选区内新旧棋子都参与，只连接正交相邻网格，不跨格连接
 -- ════════════════════════════════════════════════════════
-local WANG_SKILL2_AOE_RANGE = 6     -- 选区半径（填充 / 连接范围，大于取势的 4）
+local WANG_SKILL2_AOE_RANGE = 6     -- 外围八子距离施法中心的半径
 local WANG_SKILL2_CAST_RANGE = 20   -- 施法距离（玩家可远程施法）
-local WANG_SKILL2_DROP_WINDOW = 0.5 -- 额外落子在此时间内随机出现，避免批量动画完全同步
+local WANG_SKILL2_DROP_WINDOW = 0.5 -- 缺失棋子在此时间内按顺时针顺序全部落下
+local WANG_SKILL2_RING_COUNT = 8
 
 -- 连星区域选择器（同取势视觉：reticuleaoe 环 + 落点 ping）
 RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
@@ -282,84 +282,51 @@ RegisterTargetSelector("wang_skill3_map", MapTargetSelector {
   },
 })
 
--- ① 选区网格填充：从包里消耗棋子，按世界网格空闲格部署（近→远）
---    批量部署也播 ChuXian 出现动画（与拈子剑一致），随后转 WeiJiHuo 待机
--- 候选点 = 世界网格格中心 + 施法点偏移：吸附 OFF（默认）把施法点在其格内的偏移复制到各格，
---          保持"瞄准哪就偏哪"的手感；吸附 ON → 全部落在格中心
--- 跳过被占格（含投掷占位，与全局网格一致）与不可通行地面；包里棋子用尽即停
-local function FindDeployCandidates(cx, cz)
+-- 外围 8 个固定槽位：从正北开始，每 45° 一个，顺时针排列。
+-- 每个槽位可复用目标格周围 3×3 九格内最近的已有棋子，避免围栏过于拥挤；同一棋子只复用一次。
+-- 没有可复用棋子时才在原固定槽位落新子。
+local function FindReusableLianxingPiece(x, z, usedPieces)
+  local gx, gz = Grid:CellCoord(x, z)
   local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
-  local range = WANG_SKILL2_AOE_RANGE
-
-  -- 施法点在其所在格内的偏移（吸附 OFF 时复制到每个填充格；ON 时 offset = 0）
-  local offX, offZ = 0, 0
-  if not TUNING.WANG.PIECE_GRID_SNAP then
-    local ccx, ccz = Grid:CellCenterAt(cx, cz)
-    offX, offZ = cx - ccx, cz - ccz
-  end
-
-  -- 枚举半径内世界网格格中心（+偏移）作为候选，按距离近→远排序
-  local candidates = {}
-  for gx = math.floor((cx - range) / grid), math.floor((cx + range) / grid) do
-    for gz = math.floor((cz - range) / grid), math.floor((cz + range) / grid) do
-      local px = (gx + 0.5) * grid + offX
-      local pz = (gz + 0.5) * grid + offZ
-      local distsq = (px - cx) * (px - cx) + (pz - cz) * (pz - cz)
-      if distsq <= range * range
-          and not Grid:IsCellTaken(px, pz)
-          and TheWorld.Map:IsPassableAtPoint(px, 0, pz) then
-        table.insert(candidates, { px, pz, distsq })
+  local closest, closestDistSq
+  for dx = -1, 1 do
+    for dz = -1, 1 do
+      local piece = Grid:GetPieceAt((gx + dx + 0.5) * grid, (gz + dz + 0.5) * grid)
+      if piece ~= nil and not usedPieces[piece] then
+        local px, _, pz = piece.Transform:GetWorldPosition()
+        local distSq = (px - x) * (px - x) + (pz - z) * (pz - z)
+        if closestDistSq == nil or distSq < closestDistSq then
+          closest = piece
+          closestDistSq = distSq
+        end
       end
     end
   end
-  table.sort(candidates, function(a, b) return a[3] < b[3] end)
-  return candidates
+  return closest
 end
 
-local function SchedulePiecesInArea(doer, cx, cz, oncomplete)
-  local pending = {}
-  for _, c in ipairs(FindDeployCandidates(cx, cz)) do
-    local piece = SpawnPrefab("piece")
-    piece.persists = false
-    piece.Transform:SetPosition(c[1], 0, c[2])
-    piece:Hide()
-    if Grid:ReserveCell(piece, c[1], c[2]) then
-      if PieceResource.TryConsume(doer, 1) then
-        table.insert(pending, piece)
-      else
-        piece:Remove()
-        break -- 包里棋子用尽
-      end
+local function BuildLianxingRing(cx, cz)
+  local slots = {}
+  local missing = 0
+  local usedPieces = {}
+  for index = 1, WANG_SKILL2_RING_COUNT do
+    local angle = (index - 1) * 2 * math.pi / WANG_SKILL2_RING_COUNT
+    local x = cx + math.sin(angle) * WANG_SKILL2_AOE_RANGE
+    local z = cz + math.cos(angle) * WANG_SKILL2_AOE_RANGE
+    x, z = Grid:SnapPos(x, z)
+
+    local piece = FindReusableLianxingPiece(x, z, usedPieces)
+    if piece ~= nil then
+      usedPieces[piece] = true
+      table.insert(slots, { index = index, x = x, z = z, piece = piece })
+    elseif Grid:IsCellTaken(x, z) or not TheWorld.Map:IsPassableAtPoint(x, 0, z) then
+      return nil, 0, 'WANG_SKILL2_NO_LINK'
     else
-      piece:Remove()
+      table.insert(slots, { index = index, x = x, z = z })
+      missing = missing + 1
     end
   end
-
-  if #pending == 0 then
-    if oncomplete ~= nil then
-      oncomplete()
-    end
-    return 0
-  end
-
-  -- 不再依赖固定 0.5 秒后扫描：最后一个随机落子真正部署完成后才统一建连，
-  -- 避免末批落子与 FinishLianxing 落在同一 tick 时漏进 FindEntities。
-  local remaining = #pending
-  for _, piece in ipairs(pending) do
-    local scheduledPiece = piece
-    TheWorld:DoTaskInTime(math.random() * WANG_SKILL2_DROP_WINDOW, function()
-      if scheduledPiece:IsValid() then
-        scheduledPiece.persists = true
-        scheduledPiece:Show()
-        scheduledPiece:DeployPiece({ playappear = true })
-      end
-      remaining = remaining - 1
-      if remaining == 0 and oncomplete ~= nil then
-        oncomplete()
-      end
-    end)
-  end
-  return #pending
+  return slots, missing
 end
 
 local function CanAcceptLink(piece)
@@ -370,104 +337,132 @@ local function CanAcceptLink(piece)
   return GetTableSize(connector.fields) < (connector.max_links or TUNING.WANG.PIECE_MAX_LINKS or 4)
 end
 
-local function AreGridNeighbors(ax, az, bx, bz)
-  local agx, agz = Grid:CellCoord(ax, az)
-  local bgx, bgz = Grid:CellCoord(bx, bz)
-  local dx = math.abs(agx - bgx)
-  local dz = math.abs(agz - bgz)
-  return (dx == 1 and dz == 0) or (dx == 0 and dz == 1)
-end
-
-local function CanLinkPieces(p, q)
-  if p == q or not CanAcceptLink(p) or not CanAcceptLink(q)
-      or p.components.electricconnector.fields[q] ~= nil then
-    return false
-  end
-  local px, _, pz = p.Transform:GetWorldPosition()
-  local qx, _, qz = q.Transform:GetWorldPosition()
-  return AreGridNeighbors(px, pz, qx, qz)
-end
-
-local function HasConnectablePair(pieces)
-  for i = 1, #pieces - 1 do
-    for j = i + 1, #pieces do
-      if CanLinkPieces(pieces[i], pieces[j]) then
-        return true
-      end
+local function LinkLianxingRing(slots)
+  local linked = 0
+  for _, slot in ipairs(slots) do
+    local piece = slot.piece
+    if piece ~= nil and piece:IsValid() and piece.EnterLinkState ~= nil then
+      piece:EnterLinkState()
     end
   end
-  return false
-end
 
--- ③ 互连：选区内新旧棋子都参与，只补齐正交相邻网格间的连线
--- 复用 electricconnector:ConnectTo —— 双向注册自动去重（fields 表）；满 max_links 打 fully_electrically_linked
-local function LinkPiecesInArea(pieces)
-  for i = 1, #pieces do
-    local p = pieces[i]
-    if CanAcceptLink(p) then
-      local pc = p.components.electricconnector
-      local px, _, pz = p.Transform:GetWorldPosition()
-
-      local candidates = {}
-      for j = 1, #pieces do
-        local q = pieces[j]
-        if CanLinkPieces(p, q) then
-          local qx, _, qz = q.Transform:GetWorldPosition()
-          table.insert(candidates, { q, (qx - px) * (qx - px) + (qz - pz) * (qz - pz) })
-        end
-      end
-      table.sort(candidates, function(a, b) return a[2] < b[2] end)
-
-      for _, candidate in ipairs(candidates) do
-        if not CanAcceptLink(p) then
-          break
-        end
-        if CanLinkPieces(p, candidate[1]) then
-          pc:ConnectTo(candidate[1])
+  for index, slot in ipairs(slots) do
+    local piece = slot.piece
+    local nextPiece = slots[index % #slots + 1].piece
+    if piece ~= nil and nextPiece ~= nil and piece:IsValid() and nextPiece:IsValid()
+        and piece.components.electricconnector ~= nil and nextPiece.components.electricconnector ~= nil then
+      local connector = piece.components.electricconnector
+      if connector.fields[nextPiece] ~= nil then
+        linked = linked + 1
+      elseif CanAcceptLink(piece) and CanAcceptLink(nextPiece) then
+        connector:ConnectTo(nextPiece)
+        if connector.fields[nextPiece] ~= nil then
+          linked = linked + 1
         end
       end
     end
   end
+  return linked
+end
+
+local function FinishLianxing(slots, cx, cz, doer)
+  local linked = LinkLianxingRing(slots)
+  if doer ~= nil and doer:IsValid() then
+    Audio.PlaySfx(doer, "skill2_area_explode", 0.6)
+    Audio.PlaySfx(doer, "piece_place", 0.35)
+  end
+  ArkLogger:Debug(string.format("连星：外围八子(%.1f,%.1f) 成环 %d/8 条", cx, cz, linked))
+end
+
+-- 先为全部缺失槽位统一占位，再一次性消耗棋子，保证不会出现资源不足时的部分落子。
+local function ScheduleLianxingRing(doer, cx, cz)
+  local slots, missing, reason = BuildLianxingRing(cx, cz)
+  if slots == nil then
+    return false, reason
+  end
+  if missing > 0 and not PieceResource.Has(doer, missing) then
+    return false, 'WANG_SKILL2_NOT_ENOUGH_PIECES'
+  end
+
+  local pending = {}
+  for _, slot in ipairs(slots) do
+    if slot.piece == nil then
+      local piece = SpawnPrefab("piece")
+      piece.persists = false
+      piece.Transform:SetPosition(slot.x, 0, slot.z)
+      piece:Hide()
+      if not Grid:ReserveCell(piece, slot.x, slot.z) then
+        piece:Remove()
+        for _, pendingSlot in ipairs(pending) do
+          if pendingSlot.piece:IsValid() then
+            pendingSlot.piece:Remove()
+          end
+        end
+        return false, 'WANG_SKILL2_NO_LINK'
+      end
+      slot.piece = piece
+      table.insert(pending, slot)
+    end
+  end
+
+  if #pending > 0 and not PieceResource.TryConsume(doer, #pending) then
+    for _, pendingSlot in ipairs(pending) do
+      if pendingSlot.piece:IsValid() then
+        pendingSlot.piece:Remove()
+      end
+    end
+    return false, 'WANG_SKILL2_NOT_ENOUGH_PIECES'
+  end
+
+  if #pending == 0 then
+    FinishLianxing(slots, cx, cz, doer)
+    return true
+  end
+
+  local remaining = #pending
+  local interval = WANG_SKILL2_DROP_WINDOW / (WANG_SKILL2_RING_COUNT - 1)
+  for _, slot in ipairs(pending) do
+    TheWorld:DoTaskInTime((slot.index - 1) * interval, function()
+      if slot.piece:IsValid() then
+        slot.piece.persists = true
+        slot.piece:Show()
+        slot.piece:DeployPiece({ playappear = true })
+      end
+      remaining = remaining - 1
+      if remaining == 0 then
+        FinishLianxing(slots, cx, cz, doer)
+      end
+    end)
+  end
+  return true
 end
 
 -- ════════════════════════════════════════════════════════
 -- 连星 Action + sg（同取势：走施法动画后排程落子+连接）
 -- 链路：技能激活 → PushBufferedAction → sg:wang_lianxing_piece 播投掷动画
---       → Frame 7 PerformBufferedAction → 0.5 秒内随机落子 → 统一连接
+--       → Frame 7 PerformBufferedAction → 0.5 秒内顺时针补齐外围八子 → 首尾成环
 -- 动画来源 player_actions_deploytoss.zip（player_common 已加载）
 -- ════════════════════════════════════════════════════════
 
-local function FinishLianxing(x, z, doer)
-  local pieces = TheSim:FindEntities(x, 0, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
-  for _, p in ipairs(pieces) do
-    if p:IsValid() and p.EnterLinkState ~= nil then
-      p:EnterLinkState()
-    end
-  end
-  LinkPiecesInArea(pieces)
-  if #pieces > 0 and doer ~= nil and doer:IsValid() then
-    Audio.PlaySfx(doer, "skill2_area_explode", 0.6)
-    Audio.PlaySfx(doer, "piece_place", 0.35)
-  end
-  ArkLogger:Debug(string.format("连星：选区(%.1f,%.1f) 连接 %d 枚黑子", x, z, #pieces))
-end
-
--- 连星 action：fn 从 act.options 读取选区中心，排程随机落子；最后一枚完成部署后再统一连接（仅服务端执行）
+-- 连星 action：fn 从 act.options 读取选区中心，按固定外围槽位落子并成环（仅服务端执行）
 AddAction("LIANXING_PIECE", "LIANXING_PIECE", function(act)
   local opts = act.options
   if opts == nil or opts.x == nil or opts.z == nil or act.doer == nil then
     return true
   end
-  local x, z = opts.x, opts.z
-  SchedulePiecesInArea(act.doer, x, z, function()
-    FinishLianxing(x, z, act.doer)
-  end)
+  local ok, reason = ScheduleLianxingRing(act.doer, opts.x, opts.z)
+  if not ok then
+    Audio.PlaySfx(act.doer, "skill_cancel", 0.6)
+    if reason ~= nil and SayAndVoice ~= nil then
+      SayAndVoice(act.doer, reason)
+    end
+  end
   return true
 end)
 ACTIONS.LIANXING_PIECE.distance = 0
 
 -- 共享状态（wilson / wilson_client 同一份，同框架 USE_ARK_CURRENCY 模式）：
--- 服务端 Frame 7 排程随机落子；客户端仅播动画（PerformPreviewBufferedAction 无操作）
+-- 服务端 Frame 7 排程顺时针落子；客户端仅播动画（PerformPreviewBufferedAction 无操作）
 -- 与取势共用同一套投掷动画与时间轴（deploytoss_pre + deploytoss，Frame 22 回 idle）
 local wangLianxingState = State {
   name = "wang_lianxing_piece",
@@ -501,54 +496,25 @@ AddStategraphState("wilson_client", wangLianxingState)
 AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.LIANXING_PIECE, "wang_lianxing_piece"))
 
-local function CanCandidateLink(candidate, pieces, earlierCandidates)
-  for _, piece in ipairs(pieces) do
-    if CanAcceptLink(piece) then
-      local px, _, pz = piece.Transform:GetWorldPosition()
-      if AreGridNeighbors(candidate[1], candidate[2], px, pz) then
-        return true
-      end
-    end
-  end
-  for _, earlier in ipairs(earlierCandidates) do
-    if AreGridNeighbors(candidate[1], candidate[2], earlier[1], earlier[2]) then
-      return true
-    end
-  end
-  return false
-end
-
--- 技能2激活测试（连星）：必须能让选区新增至少一条邻格连线。
--- 先检查旧子之间能否补链；需要落子时，按实际部署顺序和库存数量模拟新旧/新新连线。
+-- 技能2激活测试（连星）：外围固定 8 个槽位，每槽可复用周围九格内已有棋子，只要求库存能补齐缺口。
 local function OnWangSkill2ActivateTest(skill, params)
   if params == nil or params.targetPos == nil then
     return false, 'WANG_SKILL2_NO_LINK'
   end
-  local x, y, z = params.targetPos:Get()
-  local pieces = TheSim:FindEntities(x, y, z, WANG_SKILL2_AOE_RANGE, { "wang_piece_deployed" }, nil)
-  if HasConnectablePair(pieces) then
-    return true
-  end
-
-  local candidates = FindDeployCandidates(x, z)
-  local earlierCandidates = {}
-  for index, candidate in ipairs(candidates) do
-    if not PieceResource.Has(skill.inst, index) then
-      break
-    end
-    if CanCandidateLink(candidate, pieces, earlierCandidates) then
-      return true
-    end
-    table.insert(earlierCandidates, candidate)
-  end
-  if TheWorld.ismastersim then
+  local x, _, z = params.targetPos:Get()
+  local slots, missing, reason = BuildLianxingRing(x, z)
+  if slots == nil then
     Audio.PlaySfx(skill.inst, "skill_cancel", 0.6)
+    return false, reason or 'WANG_SKILL2_NO_LINK'
   end
-  return false, 'WANG_SKILL2_NO_LINK'
+  if missing > 0 and not PieceResource.Has(skill.inst, missing) then
+    Audio.PlaySfx(skill.inst, "skill_cancel", 0.6)
+    return false, 'WANG_SKILL2_NOT_ENOUGH_PIECES'
+  end
+  return true
 end
 
--- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 排程随机落子
--- 实际逻辑（落子/连接态/互连）由 action fn（LIANXING_PIECE）启动，并在最后一枚随机落子完成后统一收尾
+-- 技能2激活（连星）：Push BufferedAction → sg 播连星动画 → Frame 7 fn 顺时针补齐外围八子并成环
 local function OnWangSkill2Activate(skill, data)
   local inst = skill.inst
   if data == nil or data.targetPos == nil then
@@ -564,7 +530,7 @@ local function OnWangSkill2Activate(skill, data)
   Audio.TrySayVoice(inst, "WANG_SKILL2_CAST")
   Audio.PlaySfx(inst, "skill2_select", 0.7)
 
-  ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入施法动画", pos.x, pos.z))
+  ArkLogger:Debug(string.format("连星：施法点(%.1f,%.1f) 进入外围八子施法动画", pos.x, pos.z))
 
   return true
 end

@@ -177,8 +177,13 @@ msgstr "此间无子可引……"
 
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK"
-msgid "No stones can form a link here"
-msgstr "此间无子可围……"
+msgid "The ring cannot be formed here"
+msgstr "此处无法成围……"
+
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL2_NOT_ENOUGH_PIECES
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NOT_ENOUGH_PIECES"
+msgid "Not enough black stones to complete the ring"
+msgstr "棋子不足，无法成围……"
 
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD"

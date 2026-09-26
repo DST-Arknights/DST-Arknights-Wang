@@ -24,12 +24,12 @@ local function CellKey(gx, gz)
   return gx * 1048576 + gz
 end
 
--- 世界坐标 → 格号（连星按格邻接判定连接用）
+-- 世界坐标 → 格号
 function Grid:CellCoord(x, z)
   return CellCoord(x, z)
 end
 
--- 格中心世界坐标（吸附 / 连星填充用）
+-- 格中心世界坐标（吸附用）
 function Grid:CellCenterAt(x, z)
   local gx, gz = CellCoord(x, z)
   return (gx + 0.5) * GRID_SIZE, (gz + 0.5) * GRID_SIZE
@@ -46,6 +46,13 @@ end
 -- 目标格是否被占用（已部署棋子 或 投掷占位）
 function Grid:IsCellTaken(x, z)
   return self.cells[CellKey(CellCoord(x, z))] ~= nil
+end
+
+-- 取得目标格中的已部署棋子；投掷占位不算已有棋子。
+function Grid:GetPieceAt(x, z)
+  local entry = self.cells[CellKey(CellCoord(x, z))]
+  local piece = entry ~= nil and entry.piece or nil
+  return piece ~= nil and piece:IsValid() and piece or nil
 end
 
 -- 动作采集器用的占用判断：主世界含占位（权威）；客户端空间查询近似（仅已落地棋子）

@@ -141,7 +141,7 @@ end
 
 local function StartProximityTrap(inst)
   if inst._proxTask == nil then
-    -- 首次检测延后一整个周期：连星会在 0.5 秒内收尾，可在第一次扫描前关闭任务。
+    -- 首次检测延后一整个周期：连星会在 0.5 秒内完成外围落子并转连接态，可在第一次扫描前关闭任务。
     inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, PROX_CHECK_INTERVAL)
   end
 end
@@ -471,7 +471,6 @@ local function fn()
   -- 组件惰性：只有 EnterLinkState 后 ConnectTo 才真正建连，平时无副作用
   inst:AddComponent("electricconnector")
   inst.components.electricconnector.max_links = TUNING.WANG.PIECE_MAX_LINKS or 4
-  inst.components.electricconnector.link_range = TUNING.WANG.PIECE_LINK_RANGE or 10
   inst.components.electricconnector.field_prefab = "piece_link_field"
   -- 组件构造会打 electric_connector 标签，导致原版麻刺节点(Fence)自动搜索时找到棋子，
   -- 而棋子无状态机(sg) → CanLinkTo 里 IsLinking() 崩溃。移除标签：棋子只按技能直连，不参与自动搜索

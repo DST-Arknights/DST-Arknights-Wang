@@ -177,8 +177,13 @@ msgstr "No deployed stones in range"
 
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NO_LINK"
-msgid "No stones can form a link here"
-msgstr "No stones can form a link here"
+msgid "The ring cannot be formed here"
+msgstr "The ring cannot be formed here"
+
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL2_NOT_ENOUGH_PIECES
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NOT_ENOUGH_PIECES"
+msgid "Not enough black stones to complete the ring"
+msgstr "Not enough black stones to complete the ring"
 
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD"

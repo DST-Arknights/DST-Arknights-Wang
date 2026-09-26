@@ -54,16 +54,21 @@ local assets = {
 
 local prefabs = {
   "wang_skill3_map_marker",
+  "wang_piece_explode_smoke_fx",
+  "wang_piece_explode_shadow_fx",
 }
 
 -- ────────────────────────────────────────────────────────
 -- 爆炸相关（参考游戏源码 explosive 组件 + 凯尔希二技能子弹）
 -- ────────────────────────────────────────────────────────
 
-local function SpawnFxAt(prefab, x, y, z)
+local function SpawnFxAt(prefab, x, y, z, scale)
   local fx = SpawnPrefab(prefab)
   if fx ~= nil then
     fx.Transform:SetPosition(x, y, z)
+    if scale ~= nil then
+      fx.Transform:SetScale(scale, scale, scale)
+    end
   end
 end
 
@@ -114,14 +119,13 @@ local function AoEExplode(inst, source, damage, range, active, suggest)
   end
 end
 
--- 爆炸特效：主动 = chester_transform_fx + wanda_attack_pocketwatch_old_fx（同投掷落地）
---            被动 = 仅 wanda_attack_pocketwatch_old_fx
-local function SpawnExplodeFx(inst, active)
+-- wang_fx 中复用原版素材；引爆时按范围倍率缩放，投掷落地保持原大小。
+local function SpawnExplodeFx(inst, active, scale)
   local x, y, z = inst.Transform:GetWorldPosition()
   if active then
-    SpawnFxAt("chester_transform_fx", x, y, z)
+    SpawnFxAt("wang_piece_explode_smoke_fx", x, y, z, scale)
   end
-  SpawnFxAt("wanda_attack_pocketwatch_old_fx", x, y, z)
+  SpawnFxAt("wang_piece_explode_shadow_fx", x, y, z, scale)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -499,7 +503,7 @@ local function fn()
     local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, source, damage, range, true)
-    SpawnExplodeFx(inst, true)
+    SpawnExplodeFx(inst, true, inst._explodeRangeMultiplier)
     Audio.PlaySfx(inst, "skill1_active_explode", sfx_volume or 0.6)
     inst:Remove()
   end
@@ -511,7 +515,7 @@ local function fn()
     local damage = inst._baseDamage * inst._damageMultiplier * (multiplier or 1)
     local range = EXPLODE_RANGE * inst._explodeRangeMultiplier
     AoEExplode(inst, inst, damage, range, false, source)
-    SpawnExplodeFx(inst, false)
+    SpawnExplodeFx(inst, false, inst._explodeRangeMultiplier)
     Audio.PlaySfx(inst, "piece_passive_explode", 0.65)
     inst:Remove()
   end

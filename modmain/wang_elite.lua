@@ -3,7 +3,7 @@
 -- 等级上限 {50, 80, 90} 由框架按六星配置给定，无需自定义
 -- 生命上限随成长逐渐降低：基础 181（TUNING.WANG_HEALTH），成长满后为 1
 -- 由框架 SetMaxHealthBonus 按累计等级比例平滑施加负奖励
-TUNING.WANG.MAX_HEALTH_BONUS = -180
+TUNING.WANG.MAX_HEALTH_BONUS = 1 - TUNING.WANG_HEALTH
 
 -- 各精英阶段额外配置（占位：铸子间隔 20/15/10、黑子成长、影响范围 0.5/1/1.5 等后续补充）
 TUNING.WANG.ELITE = {

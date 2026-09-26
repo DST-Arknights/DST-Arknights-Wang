@@ -2,6 +2,7 @@ require "prefabutil"
 
 -- 棋子网格占用表（scripts/wang_piecegrid.lua）：整图分区，每格至多 1 枚
 local Grid = require "wang_piecegrid"
+local PieceLimit = require "wang_piece_limit"
 local Audio = require "wang_audio"
 local Skill3MapMarkers = require "wang_skill3_mapmarkers"
 
@@ -56,6 +57,7 @@ local prefabs = {
   "wang_skill3_map_marker",
   "wang_piece_explode_smoke_fx",
   "wang_piece_explode_shadow_fx",
+  "cavehole_flick",
 }
 
 -- ────────────────────────────────────────────────────────
@@ -237,6 +239,7 @@ local function SetDeployedState(inst, deploydata)
   deploydata = deploydata or {}
 
   inst._isdeployed = true
+  inst.persists = true
   inst:AddTag("structure")
   inst:AddTag("wang_piece_deployed") -- 已部署标记：供 1 技能引爆检索
   DisableEntityCollisions(inst)
@@ -267,6 +270,7 @@ local function SetDeployedState(inst, deploydata)
 
   -- 普通部署态即为陷阱态；连星会在 EnterLinkState 中关闭检测。
   StartProximityTrap(inst)
+  PieceLimit:Register(inst, deploydata.deployer)
 end
 
 -- ────────────────────────────────────────────────────────
@@ -304,7 +308,7 @@ local function OnTossHit(inst, attacker)
   -- 特效遮盖黑子生成过程（同主动爆炸特效）
   SpawnExplodeFx(inst, true)
 
-  SetDeployedState(inst)
+  SetDeployedState(inst, { deployer = attacker })
 end
 
 -- ────────────────────────────────────────────────────────
@@ -351,11 +355,15 @@ local function OnRemove(inst)
   StopProximityTrap(inst)
   Skill3MapMarkers:Unregister(inst)
   Grid:Detach(inst)
+  PieceLimit:Unregister(inst)
 end
 
 local function OnSave(inst, data)
   if inst._isdeployed then
     data.isdeployed = true
+    data.deployer_userid = inst._deployerUserid
+    data.deployed_age = GetTime() - inst._deployTime
+    data.deployment_order = inst._deployOrder
   end
   if inst._islinked then
     data.islinked = true
@@ -377,6 +385,9 @@ local function OnLoad(inst, data)
   inst._explodeRangeMultiplier = data.explodeRangeMultiplier or 1
 
   if data.isdeployed then
+    inst._deployerUserid = data.deployer_userid
+    inst._deployTime = data.deployed_age ~= nil and (GetTime() - data.deployed_age) or nil
+    inst._deployOrder = data.deployment_order
     SetDeployedState(inst, { silent = true, randomize = true })
   end
   if data.islinked then
@@ -533,6 +544,7 @@ local function fn()
 
   -- 落子部署（拈子剑 / 连星复用）：调用方先设置 Transform，再进入部署态
   -- deploydata.playappear=true 时先播 ChuXian，再转 WeiJiHuo
+  -- deploydata.deployer 指定归属玩家；仅正式部署计入该玩家上限。
   -- 仅主世界可调用
   inst.DeployPiece = function(_, deploydata)
     if inst._isdeployed then return end

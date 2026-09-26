@@ -452,7 +452,7 @@ local function ScheduleLianxingRing(doer, cx, cz)
       if slot.piece:IsValid() then
         slot.piece.persists = true
         slot.piece:Show()
-        slot.piece:DeployPiece({ playappear = true })
+        slot.piece:DeployPiece({ playappear = true, deployer = doer })
       end
       remaining = remaining - 1
       if remaining == 0 then
@@ -945,6 +945,7 @@ local function OnWangSkill3ManualDeploy(inst, data)
         piece:Show()
         piece:DeployPiece({
           playappear = true,
+          deployer = inst,
           damageMultiplier = levelParams.damageMultiplier,
           explodeRangeMultiplier = levelParams.explodeRangeMultiplier,
         })

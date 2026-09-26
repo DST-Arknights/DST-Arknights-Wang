@@ -90,6 +90,7 @@ TUNING.WANG.EAT_EFFECT_MULTIPLIER = 0.5 -- 进食饥饿恢复（0.5倍）
 TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
 TUNING.WANG.PIECE_BASE_DAMAGE = 10    -- 爆炸基础伤害（主动 / 被动引爆）
 TUNING.WANG.PIECE_EXPLODE_RANGE = 4   -- 爆炸半径
+TUNING.WANG.PIECE_DEFAULT_LIMIT = 20 -- 无精英组件的玩家部署上限
 
 -- 连星（二技能）：棋子连接
 TUNING.WANG.PIECE_MAX_LINKS = 4       -- 每个棋子最多连接数

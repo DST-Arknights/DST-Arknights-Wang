@@ -35,7 +35,7 @@ AddAction("WANG_LUOZI", STRINGS.ACTIONS.WANG_LUOZI, function(act)
   else
     sx, sz = Grid:SnapPos(pos.x, pos.z) -- 吸附 ON → 格中心
   end
-  local deploydata = { playappear = true }
+  local deploydata = { playappear = true, deployer = doer }
   if skill ~= nil and skill:IsActivating() then
     deploydata.silent = true
     deploydata.damageMultiplier = 2

@@ -72,6 +72,7 @@ end
 
 local MAX_LEN = 15  -- 与 SetBeam 归一化基准一致（原版同值）
 local SEG_LEN = 2.15
+local TARGET_SPACING = 4
 local TARGET_RANGE = 0.1 -- 原版电场线两侧各 0.1 的碰撞宽度
 
 local SHOCK_COOLDOWNS = {
@@ -248,6 +249,24 @@ local function RefreshSegs(inst)
   inst.Physics:SetTriangleMesh(BuildFieldMesh(len * 0.5, rot * DEGREES))
   inst.Physics:SetCollides(false)
   inst.Physics:SetCollisionCallback(OnCollisionCallback)
+
+  if inst.targetx == nil then
+    inst.targetx = {}
+    inst.targetz = {}
+    local num = math.floor(len / TARGET_SPACING) + 1
+    local dx = TARGET_SPACING * costheta
+    local dz = -TARGET_SPACING * sintheta
+    local dstart = (1 - num) / 2
+    local x, _, z = inst.Transform:GetWorldPosition()
+    x = x + dx * dstart
+    z = z + dz * dstart
+    for i = 1, num do
+      inst.targetx[i] = x
+      inst.targetz[i] = z
+      x = x + dx
+      z = z + dz
+    end
+  end
 end
 
 local function OnBeamDirty(inst)

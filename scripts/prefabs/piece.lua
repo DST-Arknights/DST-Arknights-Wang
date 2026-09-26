@@ -3,6 +3,7 @@ require "prefabutil"
 -- 棋子网格占用表（scripts/wang_piecegrid.lua）：整图分区，每格至多 1 枚
 local Grid = require "wang_piecegrid"
 local Audio = require "wang_audio"
+local Skill3MapMarkers = require "wang_skill3_mapmarkers"
 
 -- ════════════════════════════════════════════════════════
 -- 望的棋子（黑子）
@@ -52,7 +53,7 @@ local assets = {
 }
 
 local prefabs = {
-  "globalmapiconunderfog",
+  "wang_skill3_map_marker",
 }
 
 -- ────────────────────────────────────────────────────────
@@ -167,18 +168,6 @@ local function DisableEntityCollisions(inst)
   end
 end
 
-local function CreateDeployedMapIcon(inst)
-  if inst._mapicon ~= nil and inst._mapicon:IsValid() then
-    return
-  end
-  local icon = SpawnPrefab("globalmapiconunderfog")
-  if icon ~= nil then
-    icon:AddTag("wang_piece_map_marker")
-    icon:TrackEntity(inst, nil, "piece.tex")
-    inst._mapicon = icon
-  end
-end
-
 -- 脚底动画纯客户端生成：非网络实体，不参与存档，也不在专服创建。
 -- 只在棋子真正进入部署态后触发；棋子预占位时虽然实体已生成，但不会提前创建 FX。
 local function CreateGroundFx(parent)
@@ -269,7 +258,7 @@ local function SetDeployedState(inst, deploydata)
     if not Grid:TryOccupy(x, z, inst) then
       ArkLogger:Debug("棋子部署但所在格已被占用（异常路径）")
     end
-    CreateDeployedMapIcon(inst)
+    Skill3MapMarkers:Register(inst)
   end
 
   -- 普通部署态即为陷阱态；连星会在 EnterLinkState 中关闭检测。
@@ -356,6 +345,7 @@ end
 
 local function OnRemove(inst)
   StopProximityTrap(inst)
+  Skill3MapMarkers:Unregister(inst)
   Grid:Detach(inst)
 end
 

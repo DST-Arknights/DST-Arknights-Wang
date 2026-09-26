@@ -19,7 +19,7 @@ RegisterPOFile(GetModConfigData("language"), {
 -- ════════════════════════════════════════════════════════
 -- 角色注册
 -- ════════════════════════════════════════════════════════
-PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box'}
+PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field', 'wang_fx', 'piece_box', 'wang_skill3_map_marker'}
 
 Assets = {
   Asset("SOUNDPACKAGE", "sound/wang.fev"),
@@ -99,6 +99,10 @@ TUNING.WANG.PIECE_LINK_RANGE = 1.9     -- 连接搜索半径（当前按选区�
 TUNING.WANG.PIECE_GRID_SIZE = 2            -- 网格边长（地皮）：占用分区 + 连星填充共用
 TUNING.WANG.PIECE_GRID_SNAP = false        -- 部署自动吸附格中心（默认关：落点即落点，格内自由偏移）
 TUNING.WANG.PIECE_PLACEHOLDER_TIMEOUT = 3  -- 投掷占位超时（秒），超时自动解锁格子
+
+-- 天下劫（三技能）：地图上的部署棋子按 20 单位固定世界网格聚合为长期选点。
+-- 固定网格保证增减棋子/读档时聚合坐标不会随成员平均位置漂移。
+TUNING.WANG.SKILL3_MAP_CLUSTER_SIZE = 20
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方

@@ -6,8 +6,37 @@ table.insert(Assets, Asset("ATLAS", "images/wang_skill.xml"))
 local ARK_CONSTANTS = require("ark_constants")
 local Grid = require("wang_piecegrid")
 local PieceResource = require("wang_piece_resource")
+local Skill3MapMarkers = require("wang_skill3_mapmarkers")
 local Audio = require("wang_audio")
 
+-- 天下劫空中态只屏蔽 locomote，不把 playercontroller 整体禁用：
+-- 这样方向移动不会进入 walk/run（避免隐身时脚步声），但右键落子等动作仍可正常执行。
+local function ApplySkill3MovementLock(inst)
+  if inst.sg == nil then
+    return
+  end
+
+  local active = inst._wang_skill3_active ~= nil and inst._wang_skill3_active:value()
+  if active then
+    -- 同一 state 内可能被 dirty / 主动调用多次；只在尚未归属时判断并补 tag，保持幂等。
+    if not inst._wang_skill3_added_overridelocomote and not inst.sg:HasStateTag("overridelocomote") then
+      inst.sg:AddStateTag("overridelocomote")
+      inst._wang_skill3_added_overridelocomote = true
+    end
+    if inst.components.locomotor ~= nil then
+      inst.components.locomotor:Stop()
+    end
+  elseif inst._wang_skill3_added_overridelocomote then
+    inst.sg:RemoveStateTag("overridelocomote")
+    inst._wang_skill3_added_overridelocomote = nil
+  end
+end
+
+local function OnSkill3NewState(inst)
+  -- GoToState 会先重建整套 state tags，因此上一状态的“由三技能添加”记录在这里失效。
+  inst._wang_skill3_added_overridelocomote = nil
+  ApplySkill3MovementLock(inst)
+end
 local function UpdateSkill3Camera(inst)
   -- 相机是本地视觉：专服不处理，房主玩家与远程客户端都需要响应 net_bool。
   if TheNet:IsDedicated() or inst ~= ThePlayer or TheCamera == nil then
@@ -45,7 +74,12 @@ end
 
 AddPlayerPostInit(function(inst)
   inst._wang_skill3_active = net_bool(inst.GUID, "wang_skill3_active", "wang_skill3_active_dirty")
-  inst:ListenForEvent("wang_skill3_active_dirty", UpdateSkill3Camera)
+  inst:ListenForEvent("wang_skill3_active_dirty", function()
+    UpdateSkill3Camera(inst)
+    ApplySkill3MovementLock(inst)
+  end)
+  -- StateGraph 每次 GoToState 都会清空动态 state tag；监听原版 newstate 重新补移动拦截。
+  inst:ListenForEvent("newstate", OnSkill3NewState)
 end)
 
 -- ════════════════════════════════════════════════════════
@@ -207,20 +241,44 @@ RegisterTargetSelector("wang_skill2_area", AreaTargetSelector {
   pingprefab     = "reticuleaoeping_6",
 })
 
--- 天下劫地图选择：选择一个已部署棋子，而不是选择棋子附近的任意位置。
--- MapTargetSelector 在客户端命中全局地图代理，在服务端解析回真实 piece 实体。
+-- 天下劫地图选择：已部署棋子由 wang_skill3_mapmarkers 按固定世界网格聚合。
+-- 客户端从全局地图代理库找最近聚合点；服务端直接从聚合管理器校验，避免依赖 CLASSIFIED 地图代理的 FindEntities。
+local WANG_SKILL3_MAP_TARGET_RANGE = 5
+local function FindWangSkill3MapMarker(_, pos)
+  local x, _, z = pos:Get()
+  if TheWorld.ismastersim then
+    return Skill3MapMarkers:FindNearestMarker(x, z, WANG_SKILL3_MAP_TARGET_RANGE)
+  end
+
+  if GlobalMapIconsDB == nil or GlobalMapIconsDB.prefabs["wang_skill3_map_marker"] == nil then
+    return nil
+  end
+  local closest, closestdsq
+  local maxdsq = WANG_SKILL3_MAP_TARGET_RANGE * WANG_SKILL3_MAP_TARGET_RANGE
+  for marker in pairs(GlobalMapIconsDB.prefabs["wang_skill3_map_marker"]) do
+    if marker:IsValid() and marker:HasTag("wang_skill3_map_marker") then
+      local mx, _, mz = marker.Transform:GetWorldPosition()
+      local dx, dz = mx - x, mz - z
+      local dsq = dx * dx + dz * dz
+      if dsq <= maxdsq and (closestdsq == nil or dsq < closestdsq) then
+        closest, closestdsq = marker, dsq
+      end
+    end
+  end
+  return closest
+end
+
 RegisterTargetSelector("wang_skill3_map", MapTargetSelector {
   actionstring = STRINGS.UI.ARK_SKILL.NAMES.WANG[3],
-  targetprefab = "piece",
-  targettags = { "wang_piece_deployed" },
-  targetrange = 5,
-  mapiconprefab = "globalmapiconunderfog",
-  mapicontag = "wang_piece_map_marker",
-  -- 地图打开后给候选棋子添加原版风格的焦点装饰；全部字段均为可选配置。
+  targetfn = FindWangSkill3MapMarker,
+  targetrange = WANG_SKILL3_MAP_TARGET_RANGE,
+  mapiconprefab = "wang_skill3_map_marker",
+  mapicontag = "wang_skill3_map_marker",
+  -- 地图打开后给候选聚合点添加原版风格的焦点装饰。
   mapfocus = {
     bank = "courier_minimap_indicator",
     build = "courier_minimap_indicator",
-    scale = 0.2
+    scale = 0.3
   },
 })
 
@@ -519,24 +577,58 @@ local WANG_SKILL3_SUPERJUMP_COLOR_G = 110 / 255
 local WANG_SKILL3_SUPERJUMP_COLOR_B = 85 / 255
 
 local function ToggleSkill3PhysicsOff(inst)
-  inst.Physics:SetCollisionMask(COLLISION.GROUND)
+  -- 起飞动画阶段只临时去掉碰撞；真正进入隐身驻留后交给 ark_flyer 接管完整飞行物理。
+  RemovePhysicsColliders(inst)
 end
 
 local function ToggleSkill3PhysicsOn(inst)
-  inst.Physics:SetCollisionMask(
-    COLLISION.WORLD,
-    COLLISION.OBSTACLES,
-    COLLISION.SMALLOBSTACLES,
-    COLLISION.CHARACTERS,
-    COLLISION.GIANTS
-  )
+  if not inst:HasTag("playerghost") and inst.Physics ~= nil then
+    ChangeToCharacterPhysics(inst)
+  end
+end
+
+local function StopSkill3InvincibilityGuard(inst)
+  if inst._wang_skill3_invincible_task ~= nil then
+    inst._wang_skill3_invincible_task:Cancel()
+    inst._wang_skill3_invincible_task = nil
+  end
+end
+
+local function StartSkill3InvincibilityGuard(inst)
+  if inst.components.health ~= nil then
+    inst.components.health:SetInvincible(true)
+  end
+  if inst._wang_skill3_invincible_task == nil then
+    inst._wang_skill3_invincible_task = inst:DoPeriodicTask(FRAMES, function(player)
+      if player._wang_skill3_airborne and player.components.health ~= nil then
+        player.components.health:SetInvincible(true)
+      end
+    end)
+  end
 end
 
 local function RestoreSkill3Player(inst, was_invincible)
   inst._wang_skill3_airborne = nil
+  StopSkill3InvincibilityGuard(inst)
+  if inst.components.talker ~= nil then
+    inst.components.talker:StopIgnoringAll("wang_skill3")
+  end
+
+  local flyer = inst.components.ark_flyer
+  if inst._wang_skill3_owns_flight then
+    inst._wang_skill3_owns_flight = nil
+    if flyer ~= nil and flyer:IsFlying() then
+      flyer:Land()
+    else
+      ToggleSkill3PhysicsOn(inst)
+    end
+  elseif flyer == nil or not flyer:IsFlying() then
+    -- 技能若在真正进入 ark_flyer 前被打断，需要把起飞动画阶段去掉的碰撞补回来。
+    ToggleSkill3PhysicsOn(inst)
+  end
+
   inst:Show()
   inst.DynamicShadow:Enable(true)
-  ToggleSkill3PhysicsOn(inst)
   if inst.components.health ~= nil then
     inst.components.health:SetInvincible(was_invincible == true)
   end
@@ -546,6 +638,8 @@ local function RestoreSkill3Player(inst, was_invincible)
   if inst._wang_skill3_active ~= nil then
     inst._wang_skill3_active:set(false)
   end
+  -- 主机/专服本地也立即释放动态移动锁；远程客户端则由 dirty 事件执行同样清理。
+  ApplySkill3MovementLock(inst)
 end
 
 -- 起手：完全沿用 Mon3tr 的 superjump_pre → superjump_lag 节奏。
@@ -585,16 +679,34 @@ AddStategraphState("wilson", State {
   end,
 })
 
-local function EnterSkill3Airborne(inst, targetpos)
+local function EnterSkill3Airborne(inst, targetpos, own_flight)
   inst._wang_skill3_airborne = true
   inst.components.locomotor:SetExternalSpeedMultiplier(inst, WANG_SKILL3_SPEED_KEY, 0)
   inst.components.locomotor:Stop()
-  ToggleSkill3PhysicsOff(inst)
+
+  -- 隐身驻留直接进入物品包 ark_flyer 的正式飞行状态：海面、碰撞、drownable、客户端预测统一复用现成实现。
+  local flyer = inst.components.ark_flyer
+  inst._wang_skill3_owns_flight = own_flight == true
+  if flyer ~= nil then
+    if own_flight and not flyer:IsFlying() then
+      flyer:TakeOff()
+    end
+  else
+    -- 理论上前置包会给所有玩家安装 ark_flyer；保留兼容兜底。
+    ToggleSkill3PhysicsOff(inst)
+  end
+
   inst.DynamicShadow:Enable(false)
-  inst.components.health:SetInvincible(true)
+  -- 隐身驻留期间持续锁定无敌，避免其它状态/组件意外清掉 invincible 后在空中异常死亡。
+  StartSkill3InvincibilityGuard(inst)
+  if inst.components.talker ~= nil then
+    inst.components.talker:ShutUp()
+    inst.components.talker:IgnoreAll("wang_skill3")
+  end
   inst:Hide()
   inst.Physics:Teleport(targetpos.x, 0, targetpos.z)
   inst._wang_skill3_active:set(true)
+  ApplySkill3MovementLock(inst)
 end
 
 local function CompleteSkill3Takeoff(inst)
@@ -608,7 +720,7 @@ local function CompleteSkill3Takeoff(inst)
   end
 
   inst.sg.statemem.completed = true
-  EnterSkill3Airborne(inst, data.targetpos)
+  EnterSkill3Airborne(inst, data.targetpos, data.own_flight)
   Audio.PlaySfx(inst, "skill3_land", 0.7)
   inst.sg:GoToState("idle", true)
 end
@@ -687,7 +799,27 @@ AddStategraphState("wilson", State {
   end,
 })
 
--- 技能结束返程：空中隐身态直接传回起点并播放落地动画，不再额外播放一次升空。
+local function BeginSkill3ReturnLanding(inst)
+  if inst.sg.statemem.landing then
+    return
+  end
+  inst.sg.statemem.landing = true
+  local data = inst.sg.statemem.data
+  RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
+  inst.sg:RemoveStateTag("noattack")
+  inst.AnimState:PlayAnimation("superjump_land")
+  inst.SoundEmitter:PlaySound("dontstarve/movement/bodyfall_dirt", nil, .35)
+  inst.sg.statemem.footstep_task = inst:DoTaskInTime(0x13 * FRAMES, function(player)
+    if player.sg ~= nil and player.sg.currentstate ~= nil
+        and player.sg.currentstate.name == "wang_skill3_return_jump_pst"
+        and player.sg.statemem.landing then
+      PlayFootstep(player)
+    end
+  end)
+end
+
+-- 技能结束返程：先在隐身状态传回起点并退出 ark_flyer；飞行真正收束后再显示落地动画。
+-- 这样 ark_flyer 的 ark_land 事件不会在可见状态下覆盖 superjump_land。
 AddStategraphState("wilson", State {
   name = "wang_skill3_return_jump_pst",
   tags = { "aoe", "doing", "busy", "noattack", "pausepredict", "nomorph", "wang_skill3" },
@@ -699,30 +831,51 @@ AddStategraphState("wilson", State {
       return
     end
     inst.sg.statemem.data = data
-    inst:Show()
+    inst:Hide()
     inst.Physics:Teleport(data.targetpos.x, 0, data.targetpos.z)
-    inst.AnimState:PlayAnimation("superjump_land")
-    inst.SoundEmitter:PlaySound("dontstarve/movement/bodyfall_dirt", nil, .35)
+
+    local flyer = inst.components.ark_flyer
+    if inst._wang_skill3_owns_flight and flyer ~= nil and flyer:IsFlying() then
+      -- Land 会立即恢复地面物理/落水判定，再用约半秒把飞行高度收回 0；此时人物仍隐藏。
+      inst._wang_skill3_owns_flight = nil
+      flyer:Land()
+      inst.sg.statemem.waiting_for_flyer = true
+      inst.sg:SetTimeout(2)
+    else
+      BeginSkill3ReturnLanding(inst)
+    end
   end,
 
-  timeline = {
-    TimeEvent(4 * FRAMES, function(inst)
-      local data = inst.sg.statemem.data
-      RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
-      inst.sg:RemoveStateTag("noattack")
-    end),
-    TimeEvent(0x13 * FRAMES, PlayFootstep),
-  },
+  onupdate = function(inst)
+    if inst.sg.statemem.waiting_for_flyer then
+      local flyer = inst.components.ark_flyer
+      if flyer == nil or not flyer:IsFlying() then
+        inst.sg.statemem.waiting_for_flyer = nil
+        BeginSkill3ReturnLanding(inst)
+      end
+    end
+  end,
+
+  ontimeout = function(inst)
+    -- 极端情况下飞行组件未正常结束也不要永久卡在隐藏状态。
+    inst.sg.statemem.waiting_for_flyer = nil
+    BeginSkill3ReturnLanding(inst)
+  end,
 
   events = {
     EventHandler("animover", function(inst)
-      if inst.AnimState:AnimDone() then
+      if inst.sg.statemem.landing and inst.AnimState:AnimDone()
+          and inst.AnimState:IsCurrentAnimation("superjump_land") then
         inst.sg:GoToState("idle")
       end
     end),
   },
 
   onexit = function(inst)
+    if inst.sg.statemem.footstep_task ~= nil then
+      inst.sg.statemem.footstep_task:Cancel()
+      inst.sg.statemem.footstep_task = nil
+    end
     local data = inst.sg.statemem.data
     RestoreSkill3Player(inst, data ~= nil and data.was_invincible)
   end,
@@ -756,6 +909,7 @@ end
 
 local function OnWangSkill3ManualDeploy(inst, data)
   local skill = inst.components.ark_skill:GetSkill("wang_skill3")
+  local levelParams = skill:GetLevelParams()
   local gx, gz = Grid:CellCoord(data.x, data.z)
   local grid = TUNING.WANG.PIECE_GRID_SIZE or 2
   local pending = {}
@@ -790,8 +944,8 @@ local function OnWangSkill3ManualDeploy(inst, data)
         piece:Show()
         piece:DeployPiece({
           playappear = true,
-          damageMultiplier = 2,
-          explodeRangeMultiplier = 2,
+          damageMultiplier = levelParams.damageMultiplier,
+          explodeRangeMultiplier = levelParams.explodeRangeMultiplier,
         })
       end
     end)
@@ -809,28 +963,32 @@ local function OnWangSkill3ActivateTest(skill, params)
   if not HasNianziSword(skill.inst) then
     return false, 'WANG_SKILL3_NEED_SWORD'
   end
-  local target = params ~= nil and params.target or nil
-  return target ~= nil and target:IsValid()
-    and target.prefab == "piece" and target:HasTag("wang_piece_deployed")
+  -- 地图选择器已在主客两端把点击吸附到聚合代理中心；这里只需要聚合坐标，不依赖具体棋子实体。
+  return params ~= nil and params.targetPos ~= nil
 end
 
 local function OnWangSkill3Activate(skill, data)
   local inst = skill.inst
-  local target = data.target
+  local targetpos = data ~= nil and data.targetPos or nil
+  if targetpos == nil then
+    return false
+  end
   local ox, oy, oz = inst.Transform:GetWorldPosition()
-  local tx, ty, tz = target.Transform:GetWorldPosition()
   skill:SetState("origin", { x = ox, y = oy, z = oz })
-  skill:SetState("target", { x = tx, y = ty, z = tz })
+  skill:SetState("target", { x = targetpos.x, y = targetpos.y, z = targetpos.z })
   skill:SetState("was_invincible", inst.components.health.invincible)
+  local flyer = inst.components.ark_flyer
+  skill:SetState("was_flying", flyer ~= nil and flyer:IsFlying() or false)
   for _ = 1, 10 do
     local item = SpawnPrefab("piece")
     if not PieceResource.Give(inst, item) then
       item:Remove()
     end
   end
-  Audio.TrySayVoice(inst, "WANG_SKILL3_CAST")
+  -- 三技能台词保留语音但不生成文字气泡；起飞前文字一旦广播，之后 ShutUp 无法可靠撤回远端 HUD。
+  Audio.TrySayVoice(inst, "WANG_SKILL3_CAST", { text = false })
   Audio.PlaySfx(inst, "skill3_start", 0.7)
-  target:Remove()
+  return true
 end
 
 local function OnWangSkill3ActivateEffect(skill, data)
@@ -843,7 +1001,7 @@ local function OnWangSkill3ActivateEffect(skill, data)
   local targetpos = Vector3(target.x, target.y, target.z)
   if data ~= nil and data.source == "load" then
     -- 激活中的技能读档时直接恢复空中位置，不重复播放一次起飞。
-    EnterSkill3Airborne(inst, targetpos)
+    EnterSkill3Airborne(inst, targetpos, skill:GetState("was_flying") ~= true)
     return
   end
 
@@ -851,6 +1009,7 @@ local function OnWangSkill3ActivateEffect(skill, data)
   inst.sg:GoToState("wang_skill3_takeoff_pre", {
     targetpos = targetpos,
     was_invincible = skill:GetState("was_invincible") == true,
+    own_flight = skill:GetState("was_flying") ~= true,
   })
 end
 
@@ -956,7 +1115,10 @@ local skillConfig = {
       -- activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
       activationEnergy = 10,
       maxActivationStacks = 1,
-      params = {},
+      params = {
+        damageMultiplier = 2,
+        explodeRangeMultiplier = 2,
+      },
       bulletCount = 40,
     } },
     OnInstall = OnWangSkill3Install,

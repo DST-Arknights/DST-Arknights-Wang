@@ -37,6 +37,17 @@ local function OnSkill3NewState(inst)
   inst._wang_skill3_added_overridelocomote = nil
   ApplySkill3MovementLock(inst)
 end
+
+-- 三技能 active 是跨主客机同步的长期状态；客户端也据此补隐藏，避免读档/重连时仅服务端 Hide 但本地仍短暂现形。
+local function ApplySkill3HiddenVisual(inst)
+  if inst._wang_skill3_active ~= nil and inst._wang_skill3_active:value() then
+    inst:Hide()
+    if inst.DynamicShadow ~= nil then
+      inst.DynamicShadow:Enable(false)
+    end
+  end
+end
+
 local function UpdateSkill3Camera(inst)
   -- 相机是本地视觉：专服不处理，房主玩家与远程客户端都需要响应 net_bool。
   if TheNet:IsDedicated() or inst ~= ThePlayer or TheCamera == nil then
@@ -75,6 +86,7 @@ end
 AddPlayerPostInit(function(inst)
   inst._wang_skill3_active = net_bool(inst.GUID, "wang_skill3_active", "wang_skill3_active_dirty")
   inst:ListenForEvent("wang_skill3_active_dirty", function()
+    ApplySkill3HiddenVisual(inst)
     UpdateSkill3Camera(inst)
     ApplySkill3MovementLock(inst)
   end)
@@ -982,6 +994,14 @@ local function OnWangSkill3ActivateEffect(skill, data)
   if data ~= nil and data.source == "load" then
     -- 激活中的技能读档时直接恢复空中位置，不重复播放一次起飞。
     EnterSkill3Airborne(inst, targetpos, skill:GetState("was_flying") ~= true)
+    -- 原版 playerspawner 会在加载后的约第 6 帧无条件 Show 玩家；延后一次重申隐藏即可覆盖，
+    -- 不需要在整个空中阶段每帧重复处理可见性。
+    inst:DoTaskInTime(10 * FRAMES, function(player)
+      if player:IsValid() and player._wang_skill3_airborne
+          and player._wang_skill3_active ~= nil and player._wang_skill3_active:value() then
+        ApplySkill3HiddenVisual(player)
+      end
+    end)
     return
   end
 

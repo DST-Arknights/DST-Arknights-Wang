@@ -396,6 +396,13 @@ end
 -- 锤击只作为一次性交互触发，不走生命/伤害结算；棋子本体移除后生成普通物品态黑子。
 -- boss / 自然灾害等其它摧毁路径仍可通过外部调用 PassiveExplode 触发被动引爆。
 -- ────────────────────────────────────────────────────────
+local function PieceShouldRecoil(_, _, tool, numworks)
+  -- 拈子剑保留对普通建筑 0 HAMMER 效率；仅回收棋子时把本次工作量视为 1。
+  if tool ~= nil and tool.prefab == "nianzi_sword" and (numworks or 0) <= 0 then
+    return false, 1
+  end
+end
+
 local function OnHammered(inst, worker)
   if not inst._isdeployed then
     inst:Remove()
@@ -590,6 +597,7 @@ local function fn()
   inst.components.workable:SetWorkAction(ACTIONS.HAMMER)
   inst.components.workable:SetWorkLeft(1)
   inst.components.workable:SetOnFinishCallback(OnHammered)
+  inst.components.workable:SetShouldRecoilFn(PieceShouldRecoil)
   inst.components.workable:SetWorkable(false)
 
   -- 连接态（连星）：复用原版 electricconnector，连接/断开/读档重连全内置

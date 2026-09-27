@@ -1,7 +1,7 @@
 -- 配方交流动作（recipe_mastery 组件）
 -- 传授：望作为教师，把自己掌握而目标未掌握的随机配方传给目标。
 -- 请教：望作为学生，从目标掌握而自己未掌握的配方中随机学习一个。
--- 两者都走右键场景动作，并共用同一套 10 秒坐姿流程：发起者锁定，目标方可主动打断；学生累计损失理智。
+-- 两者都走右键场景动作，并共用同一套 10 秒坐姿流程：发起者锁定，目标方可主动打断；交流双方持续损失理智。
 
 local INITIATOR_STATE = "wang_recipe_exchange"
 local PARTNER_STATE = "wang_recipe_exchange_partner"
@@ -100,36 +100,22 @@ local function TeachRandomRecipe(teacher, student)
   return true
 end
 
-local function DrainStudentSanity(inst, amount)
-  if amount <= 0 or inst.components.sanity == nil then
-    return
-  end
-  inst.components.sanity:DoDelta(-amount)
-  inst.sg.statemem.recipe_sanity_drained = (inst.sg.statemem.recipe_sanity_drained or 0) + amount
-end
+local SANITY_DRAIN_KEY = "wang_recipe_exchange"
 
-local function StartStudentSanityDrain(inst)
-  inst.sg.statemem.recipe_sanity_drained = 0
-  local per_second = TUNING.WANG.TEACH_SANITY_TOTAL / TUNING.WANG.TEACH_DURATION
-  inst.sg.statemem.recipe_sanity_task = inst:DoPeriodicTask(1, function(player)
-    if player.sg.statemem.recipe_is_student then
-      DrainStudentSanity(player, per_second)
-    end
-  end, 1)
-end
-
-local function StopStudentSanityDrain(inst)
-  if inst.sg.statemem.recipe_sanity_task ~= nil then
-    inst.sg.statemem.recipe_sanity_task:Cancel()
-    inst.sg.statemem.recipe_sanity_task = nil
+local function StartExchangeSanityDrain(inst)
+  local sanity = inst.components.sanity
+  if sanity ~= nil then
+    sanity.externalmodifiers:SetModifier(
+        inst,
+        -TUNING.WANG.TEACH_SANITY_TOTAL / TUNING.WANG.TEACH_DURATION,
+        SANITY_DRAIN_KEY)
   end
 end
 
-local function FinishStudentSanityDrain(inst)
-  local drained = inst.sg.statemem.recipe_sanity_drained or 0
-  local remain = TUNING.WANG.TEACH_SANITY_TOTAL - drained
-  if remain > 0 then
-    DrainStudentSanity(inst, remain)
+local function StopExchangeSanityDrain(inst)
+  local sanity = inst.components.sanity
+  if sanity ~= nil then
+    sanity.externalmodifiers:RemoveModifier(inst, SANITY_DRAIN_KEY)
   end
 end
 
@@ -195,9 +181,7 @@ local partnerState = State {
     if TheWorld.ismastersim then
       inst.sg.statemem.initiator = data ~= nil and data.initiator or nil
       inst.sg.statemem.recipe_is_student = data ~= nil and data.is_student == true
-      if inst.sg.statemem.recipe_is_student then
-        StartStudentSanityDrain(inst)
-      end
+      StartExchangeSanityDrain(inst)
     end
 
     -- 发起方在 10 秒整负责结算；这里多留 1 秒只作异常兜底，避免双方 timeout 同帧竞争。
@@ -213,7 +197,7 @@ local partnerState = State {
       return
     end
 
-    StopStudentSanityDrain(inst)
+    StopExchangeSanityDrain(inst)
 
     if not inst.sg.statemem.recipe_exit_silent then
       local initiator = inst.sg.statemem.initiator
@@ -263,8 +247,8 @@ local initiatorState = State {
       return
     end
 
+    StartExchangeSanityDrain(inst)
     if is_ask then
-      StartStudentSanityDrain(inst)
       -- 请教时目标是教师；用通用教学台词，不要求其它角色额外提供专属文本。
       if target.components.talker ~= nil then
         target.components.talker:Say(STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE)
@@ -326,7 +310,6 @@ local initiatorState = State {
 
     local teacher = is_ask and target or inst
     local student = is_ask and inst or target
-    FinishStudentSanityDrain(student)
     TeachRandomRecipe(teacher, student)
 
     target.sg.statemem.recipe_exit_silent = true
@@ -340,7 +323,7 @@ local initiatorState = State {
       return
     end
 
-    StopStudentSanityDrain(inst)
+    StopExchangeSanityDrain(inst)
     if inst.sg.statemem.completed then
       return
     end

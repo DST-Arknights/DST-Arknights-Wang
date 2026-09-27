@@ -6,6 +6,7 @@
 -- ════════════════════════════════════════════════════════
 
 local SPLASH_RANGE = 1 -- 攻击溅射范围（目标周围 1 格）
+local AREA_EXCLUDE_TAGS = { "INLIMBO", "notarget", "noattack", "flight", "invisible", "playerghost" }
 
 RegisterInventoryItemAtlas("images/inventoryimages/nianzi_sword.xml", "nianzi_sword.tex")
 
@@ -28,21 +29,13 @@ local function onunequip(inst, owner)
   owner.AnimState:Show("ARM_normal")
 end
 
--- 攻击命中后，对目标周围 1 格内其他可攻击生物造成溅射伤害（主目标不重复）
+-- 攻击命中后，复用原版 combat 的范围攻击逻辑：自动排除攻击者自己，并遵循原版目标/PVP判断与伤害计算。
 local function OnAttack(inst, attacker, target)
-  if target == nil or not target:IsValid() then
+  if target == nil or not target:IsValid()
+      or attacker == nil or attacker.components.combat == nil then
     return
   end
-  local x, y, z = target.Transform:GetWorldPosition()
-  local ents = TheSim:FindEntities(x, y, z, SPLASH_RANGE, nil, { "INLIMBO", "playerghost" })
-  local damage = inst.components.weapon:GetDamage(attacker, target)
-  for _, ent in ipairs(ents) do
-    if ent ~= target and ent:IsValid() and not ent:IsInLimbo()
-        and ent.components.combat ~= nil and ent.components.combat:CanBeAttacked()
-        and not (ent.components.health ~= nil and ent.components.health:IsDead()) then
-      ent.components.combat:GetAttacked(attacker, damage)
-    end
-  end
+  attacker.components.combat:DoAreaAttack(target, SPLASH_RANGE, inst, nil, nil, AREA_EXCLUDE_TAGS)
 end
 
 local function fn()

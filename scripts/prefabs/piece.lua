@@ -8,8 +8,8 @@ local Skill3MapMarkers = require "wang_skill3_mapmarkers"
 
 -- ════════════════════════════════════════════════════════
 -- 望的棋子（黑子）
--- 物品态（可堆叠 / 可装备投掷）→ 投掷落地转部署态
---   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS，水球模式)
+-- piece：物品态 / 最终部署态；piece_projectile：独立投掷飞行实体
+--   物品态   — 可入背包(堆叠 120) / 装备手上右键投掷(TOSS)
 --   部署态   — 地面建筑(structure)，可被锤子 / boss 摧毁；自动检测附近敌人并被动引爆
 --              无实体碰撞（可走穿，间距由网格管）；进入连星态后停止陷阱检测
 -- 投掷落地：生成 chester_transform_fx + wanda_attack_pocketwatch_old_fx
@@ -365,11 +365,15 @@ local function OnTossHit(inst, attacker)
     return
   end
 
-  -- 极端异常（预部署实体被外部移除）时不凭空占格，飞行棋子落地后仍可拾取。
+  -- 极端异常（预部署实体被外部移除）时不凭空占格；返还一枚普通黑子到实际落点。
   if reserved ~= nil and reserved:IsValid() then
     reserved:Remove()
   end
-  inst.AnimState:PlayAnimation("idle", true)
+  local piece = SpawnPrefab("piece")
+  if piece ~= nil then
+    piece.Transform:SetPosition(x, 0, z)
+  end
+  inst:Remove()
 end
 
 -- ────────────────────────────────────────────────────────
@@ -435,7 +439,6 @@ local function CopyDeploySnapshot(source, target)
 end
 
 local function OnTossLaunch(inst, attacker, targetPos)
-  inst:PushEvent("wang_piece_toss_launch", { deployer = attacker })
   inst.AnimState:PlayAnimation("XuanZuan", true)
   Audio.PlaySfx(inst, "piece_projectile_start", 0.5)
 
@@ -453,14 +456,17 @@ local function OnTossLaunch(inst, attacker, targetPos)
   end
 end
 
-local function OnRemove(inst)
-  StopProximityTrap(inst)
-  Skill3MapMarkers:Unregister(inst)
+local function OnProjectileRemove(inst)
   local reserved = inst._wang_toss_target_piece
   inst._wang_toss_target_piece = nil
   if reserved ~= nil and reserved:IsValid() and not reserved._isdeployed then
     reserved:Remove()
   end
+end
+
+local function OnRemove(inst)
+  StopProximityTrap(inst)
+  Skill3MapMarkers:Unregister(inst)
   PieceLimit:Unregister(inst)
 end
 
@@ -520,9 +526,8 @@ local function fn()
 
   MakeInventoryFloatable(inst)
 
-  -- 投掷相关（客户端也要有，用于右键菜单生成 TOSS 动作）
+  -- 投掷物标签保留在 pristine state；真正飞行组件位于 piece_projectile。
   inst:AddTag("projectile")
-  inst:AddTag("complexprojectile")
 
   -- 瞄准圈（装备时由 playercontroller 创建，客户端组件）
   inst:AddComponent("reticule")
@@ -556,6 +561,10 @@ local function fn()
   inst._islinked = false -- 连接态（连星）标志
   inst._proxTask = nil   -- 仅普通部署态运行；连星/物品等其它状态均关闭
 
+  -- AddComponent("complexprojectile") 原本会自动注册这组组件动作；现在物品与飞行 prefab 分离，
+  -- 因此只注册原版动作采集，让客户端仍能生成 TOSS，真正 Launch 由 wang_piecegrid.lua 处理。
+  inst:RegisterComponentActions("complexprojectile")
+
   -- 服务端移除时清理玩法状态；网格释放由上方主客机共用的 onremove 监听统一处理。
   inst:ListenForEvent("onremove", OnRemove)
 
@@ -574,16 +583,7 @@ local function fn()
   inst.components.equippable:SetOnEquip(OnEquip)
   inst.components.equippable:SetOnUnequip(OnUnequip)
 
-  -- 投掷：item 本身作为抛物线投掷物（waterballoon 模式）
-  -- 投掷 = 消耗：TOSS 把装备的单个黑子丢出，落地转部署态，堆叠中其余保留
-  inst:AddComponent("complexprojectile")
-  inst.components.complexprojectile:SetHorizontalSpeed(THROW_SPEED)
-  inst.components.complexprojectile:SetGravity(THROW_GRAVITY)
-  inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
-  inst.components.complexprojectile:SetTargetOffset(Vector3(0, 1.5, 0)) -- 终点Y轴抬高，匹配部署飘浮动画
-  inst.components.complexprojectile:SetOnHit(OnTossHit)
-  -- 投掷飞行中播放旋转动画，并在目标格生成隐藏最终棋子（避免连续投掷堆叠）
-  inst.components.complexprojectile:SetOnLaunch(OnTossLaunch)
+  -- 真正的抛物线组件放在独立 piece_projectile 上；piece 只保留 pristine action tag 供客户端采集 TOSS。
 
   -- 部署态可被锤击回收；workable 只提供一次性 HAMMER 交互，不承担伤害结算。
   inst:AddComponent("workable")
@@ -666,4 +666,51 @@ local function fn()
   return inst
 end
 
-return Prefab("piece", fn, assets, prefabs)
+-- 独立飞行实体：参考原版 slingshotammo_*_proj / cannonball_rock 的物品与投射物分离模式。
+local function projectile_fn()
+  local inst = CreateEntity()
+
+  inst.entity:AddTransform()
+  inst.entity:AddAnimState()
+  inst.entity:AddSoundEmitter()
+  inst.entity:AddNetwork()
+
+  MakeInventoryPhysics(inst)
+  DisableEntityCollisions(inst)
+
+  inst.AnimState:SetBank("piece")
+  inst.AnimState:SetBuild("piece")
+  inst.AnimState:PlayAnimation("XuanZuan", true)
+
+  inst:AddTag("projectile")
+  inst:AddTag("NOCLICK")
+
+  inst.entity:SetPristine()
+
+  if not TheWorld.ismastersim then
+    return inst
+  end
+
+  inst.persists = false
+  inst:ListenForEvent("onremove", OnProjectileRemove)
+
+  inst:AddComponent("complexprojectile")
+  inst.components.complexprojectile:SetHorizontalSpeed(THROW_SPEED)
+  inst.components.complexprojectile:SetGravity(THROW_GRAVITY)
+  inst.components.complexprojectile:SetLaunchOffset(Vector3(0.25, 1, 0))
+  -- 地面落子不设置 targetoffset：原版 point TOSS 直接瞄准地面，轨迹会在目标点附近真正落地。
+  inst.components.complexprojectile:SetOnLaunch(OnTossLaunch)
+  inst.components.complexprojectile:SetOnHit(OnTossHit)
+
+  -- 起飞前由 wang_piecegrid.lua 写入本次部署快照。
+  inst._baseDamage = TUNING.WANG.PIECE_BASE_DAMAGE
+  inst._eliteBonusDamage = 0
+  inst._damageMultiplier = 1
+  inst._explodeRangeMultiplier = 1
+  inst._neighborMode = "cross"
+
+  return inst
+end
+
+return Prefab("piece", fn, assets, prefabs),
+    Prefab("piece_projectile", projectile_fn, assets, { "piece" })

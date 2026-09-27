@@ -125,6 +125,8 @@ TUNING.WANG.MASTER_CHANCE = {
 TUNING.WANG.AMULET_MASTERY_BONUS = 0.5             -- 建筑护符：掌握成功率加算 50%（各阶级一致）
 TUNING.WANG.SANITY_DRAIN_PER_UNMASTERED = -0.2      -- 每个未掌握配方每秒掉理智（占位）
 TUNING.WANG.SANITY_RECOVERY_PER_MASTERED = 0.05     -- 每个已掌握配方每秒回理智（占位）
+TUNING.WANG.TEACH_DURATION = 10                       -- 传授持续时间（秒）
+TUNING.WANG.TEACH_SANITY_TOTAL = 30                   -- 完整传授累计损失理智
 -- 升级自动掌握：按难度档权重分配（科一/魔一/科二/魔二/远古/暗影月亮/其他）
 TUNING.WANG.AUTO_MASTER_WEIGHTS = {
   { 75, 25, 0, 0, 0, 0, 0 },   -- 无精英化

@@ -49,7 +49,9 @@ local RecipeMastery = Class(function(self, inst)
   self.inst = inst
   self.states = {}                 -- [配方名] = RECIPE_MASTERY_STATE 数字，与副本一致
   self.sanity_buff_enabled = false -- 精神增益开启状态不存档，由用户组件手动启用
-  self.enable_teaching = false          -- 可传授开关
+  self.enable_teaching = false     -- 最终可传授开关（默认关闭）
+  self.teaching_elite_enabled = false
+  self.teaching_sanity_debuffs = 0
   -- （不传 source，默认以 inst 为 source，实体移除时自动清理）
   inst:ListenForEvent("learnrecipe", OnLearnRecipe)
 end, nil, {
@@ -58,7 +60,26 @@ end, nil, {
 
 -- 可传授开关（教学者身份；同步到副本网络变量，客户端采集器可读）
 function RecipeMastery:EnableTeaching(enabled)
-  self.enable_teaching = enabled
+  self.enable_teaching = enabled == true
+end
+
+function RecipeMastery:IsTeachingEnabled()
+  return self.enable_teaching
+end
+
+-- 精二解锁与持续负理智层共同决定是否允许传授。
+function RecipeMastery:UpdateTeachingEnabled()
+  self:EnableTeaching(self.teaching_elite_enabled and self.teaching_sanity_debuffs <= 0)
+end
+
+function RecipeMastery:SetTeachingEliteEnabled(enabled)
+  self.teaching_elite_enabled = enabled == true
+  self:UpdateTeachingEnabled()
+end
+
+function RecipeMastery:SetTeachingSanityDebuffCount(count)
+  self.teaching_sanity_debuffs = math.max(0, count or 0)
+  self:UpdateTeachingEnabled()
 end
 
 -- 精英阶级
@@ -175,6 +196,7 @@ end
 function RecipeMastery:UpdateSanityBuff()
   self._sanity_mastering = self:CountState(RECIPE_MASTERY_STATE.MASTERING)
   self._sanity_mastered = self:CountState(RECIPE_MASTERY_STATE.MASTERED)
+  self:SetTeachingSanityDebuffCount(self._sanity_mastering)
 end
 
 -- 接口：开启自动掌握（监听制作完成，有几率解锁；不拦截制作逻辑）

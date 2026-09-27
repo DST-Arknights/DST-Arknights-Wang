@@ -184,6 +184,13 @@ local function OnWangRecipeMastered(inst, data)
   end
 end
 
+-- 精二解锁传授资格；最终开关还会与 recipe_mastery 的持续负理智层共同判定。
+local function OnWangApplyElite(inst, elite)
+  if inst.components.recipe_mastery ~= nil then
+    inst.components.recipe_mastery:SetTeachingEliteEnabled(elite >= 3)
+  end
+end
+
 -- ════════════════════════════════════════════════════════
 -- 存档（配方掌握状态由 recipe_mastery 组件自身存档）
 -- ════════════════════════════════════════════════════════
@@ -229,6 +236,7 @@ local function master_post_init(inst)
   -- 六星干员，精英化（精英0/1/2，等级上限 50/80/90 由框架按六星配置）
   inst:AddComponent("ark_elite")
   inst.components.ark_elite:SetRarity(6)
+  inst.components.ark_elite:SetOnApplyElite(OnWangApplyElite)
   -- 生命上限随成长降低：基础 181，成长满后为 1（框架按累计等级平滑施加负奖励）
   inst.components.ark_elite:SetMaxHealthBonus(TUNING.WANG.MAX_HEALTH_BONUS)
   -- 关闭击杀经验，改为自定义来源（解锁配方 / 使用技能）
@@ -261,11 +269,13 @@ local function master_post_init(inst)
     eliteLevelMap = { [1] = 1, [2] = 2, [3] = 3 }, -- 精英0→1级，精英1→2级，精英2→3级
   })
 
-  -- 配方掌握（望安装并启用：自动掌握 / 精神增益 / 可传授）
-  inst:AddComponent("recipe_mastery")
+  -- 配方掌握（全玩家 PostInit 已挂组件；望额外启用自动掌握 / 精神增益）
+  if inst.components.recipe_mastery == nil then
+    inst:AddComponent("recipe_mastery")
+  end
   inst.components.recipe_mastery:EnableAutoMastery()
   inst.components.recipe_mastery:EnableSanityBuff()
-  inst.components.recipe_mastery:EnableTeaching(true)
+  inst.components.recipe_mastery:SetTeachingEliteEnabled(inst.components.ark_elite.elite >= 3)
 
   -- 事件监听（经验 / 升级自动掌握 / 掌握经验）
   inst:ListenForEvent("ark_skill_activate", OnSkillActivated)

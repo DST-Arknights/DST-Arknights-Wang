@@ -127,13 +127,23 @@ msgstr "此物非一人能负……"
 
 #. STRINGS.ACTIONS.TEACH_RECIPE
 msgctxt "STRINGS.ACTIONS.TEACH_RECIPE"
-msgid "Teach Recipe"
-msgstr "传授配方"
+msgid "Teach"
+msgstr "传授"
+
+#. STRINGS.ACTIONS.ASK_RECIPE
+msgctxt "STRINGS.ACTIONS.ASK_RECIPE"
+msgid "Ask"
+msgstr "请教"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE"
 msgid "All that I know, you already know... I have no new moves to teach."
 msgstr "我所知的，你已尽知……再无可授之招。"
+
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.ASK_RECIPE.ASK_NONE
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.ASK_RECIPE.ASK_NONE"
+msgid "What you know, I already know... There is nothing more to ask."
+msgstr "你所知的，我已尽知……再无可请教之处。"
 
 #. STRINGS.NAMES.PIECE
 msgctxt "STRINGS.NAMES.PIECE"

@@ -127,13 +127,23 @@ msgstr "Too heavy to carry alone... I'll need a beefalo."
 
 #. STRINGS.ACTIONS.TEACH_RECIPE
 msgctxt "STRINGS.ACTIONS.TEACH_RECIPE"
-msgid "Teach Recipe"
-msgstr "Teach Recipe"
+msgid "Teach"
+msgstr "Teach"
+
+#. STRINGS.ACTIONS.ASK_RECIPE
+msgctxt "STRINGS.ACTIONS.ASK_RECIPE"
+msgid "Ask"
+msgstr "Ask"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.TEACH_RECIPE.TEACH_NONE"
 msgid "All that I know, you already know... I have no new moves to teach."
 msgstr "All that I know, you already know... I have no new moves to teach."
+
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.ASK_RECIPE.ASK_NONE
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.ASK_RECIPE.ASK_NONE"
+msgid "What you know, I already know... There is nothing more to ask."
+msgstr "What you know, I already know... There is nothing more to ask."
 
 #. STRINGS.NAMES.PIECE
 msgctxt "STRINGS.NAMES.PIECE"

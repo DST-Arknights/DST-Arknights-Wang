@@ -1,9 +1,10 @@
--- 配方教学动作（recipe_mastery 组件，通用——教学者不限于望）
--- 采集器：双方都有掌握组件 + 执行者可传授开关开即可显示
--- 流程：教师进入不可主动打断的坐姿，学生进入可自行打断的坐姿；持续 10 秒后随机传授一个配方。
+-- 配方交流动作（recipe_mastery 组件）
+-- 传授：望作为教师，把自己掌握而目标未掌握的随机配方传给目标。
+-- 请教：望作为学生，从目标掌握而自己未掌握的配方中随机学习一个。
+-- 两者都走右键场景动作，并共用同一套 10 秒坐姿流程：发起者锁定，目标方可主动打断；学生累计损失理智。
 
-local TEACHER_STATE = "wang_teach_recipe"
-local STUDENT_STATE = "wang_learn_recipe"
+local INITIATOR_STATE = "wang_recipe_exchange"
+local PARTNER_STATE = "wang_recipe_exchange_partner"
 local TEACH_SIT_ANIMS = {
   { "emote_pre_sit2", "emote_loop_sit2" },
   { "emote_pre_sit4", "emote_loop_sit4" },
@@ -15,46 +16,87 @@ local function PlayTeachSit(inst)
   inst.AnimState:PushAnimation(anims[2], true)
 end
 
--- diff 双方已掌握列表：返回可教的配方（服务端）
-local function GetTeachDiff(teacher, target)
+-- 返回 teacher 已掌握、student 尚未掌握的配方列表。
+local function GetTeachDiff(teacher, student)
   local teacher_mastery = teacher ~= nil and teacher.replica.recipe_mastery or nil
-  local target_mastery = target ~= nil and target.replica.recipe_mastery or nil
-  if teacher_mastery == nil or target_mastery == nil then
+  local student_mastery = student ~= nil and student.replica.recipe_mastery or nil
+  if teacher_mastery == nil or student_mastery == nil then
     return {}
   end
 
   local candidates = {}
   local list = teacher_mastery:GetRecipeListByState(RECIPE_MASTERY_STATE.MASTERED)
   for _, name in ipairs(list) do
-    if target_mastery:GetState(name) ~= RECIPE_MASTERY_STATE.MASTERED then
+    if student_mastery:GetState(name) ~= RECIPE_MASTERY_STATE.MASTERED then
       table.insert(candidates, name)
     end
   end
   return candidates
 end
 
-local function CanTeach(teacher, target)
-  return teacher ~= nil
-      and target ~= nil
-      and teacher ~= target
-      and teacher:IsValid()
-      and target:IsValid()
-      and not teacher:HasTag("playerghost")
-      and not target:HasTag("playerghost")
-      and teacher.components.recipe_mastery ~= nil
-      and target.components.recipe_mastery ~= nil
+local function CanPair(a, b)
+  return a ~= nil
+      and b ~= nil
+      and a ~= b
+      and a:IsValid()
+      and b:IsValid()
+      and not a:HasTag("playerghost")
+      and not b:HasTag("playerghost")
+      and a.components.recipe_mastery ~= nil
+      and b.components.recipe_mastery ~= nil
+end
+
+local function CanTeach(teacher, student)
+  return CanPair(teacher, student)
       and teacher.components.recipe_mastery:IsTeachingEnabled()
 end
 
-local function TeachRandomRecipe(teacher, target)
-  if not CanTeach(teacher, target) then
-    return false
+local function CanAsk(student, teacher)
+  -- 请教是望的专属主动交互；资格沿用传授的精二 / 无持续负理智状态开关。
+  return CanPair(student, teacher)
+      and student.prefab == "wang"
+      and student.components.recipe_mastery:IsTeachingEnabled()
+end
+
+-- 决定望对目标右键时唯一显示的交流动作：
+-- 1. 双方掌握集合一致：无动作；
+-- 2. 望是目标的真子集：请教；
+-- 3. 其余只要望有目标不会的配方：传授（双方各有独有配方时也优先传授）。
+local function GetExchangeMode(wang, target)
+  local wang_mastery = wang ~= nil and wang.replica.recipe_mastery or nil
+  local target_mastery = target ~= nil and target.replica.recipe_mastery or nil
+  if wang_mastery == nil or target_mastery == nil then
+    return nil
   end
-  local candidates = GetTeachDiff(teacher, target)
+
+  local wang_has_extra = false
+  for _, name in ipairs(wang_mastery:GetRecipeListByState(RECIPE_MASTERY_STATE.MASTERED)) do
+    if target_mastery:GetState(name) ~= RECIPE_MASTERY_STATE.MASTERED then
+      wang_has_extra = true
+      break
+    end
+  end
+
+  local target_has_extra = false
+  for _, name in ipairs(target_mastery:GetRecipeListByState(RECIPE_MASTERY_STATE.MASTERED)) do
+    if wang_mastery:GetState(name) ~= RECIPE_MASTERY_STATE.MASTERED then
+      target_has_extra = true
+      break
+    end
+  end
+
+  if not wang_has_extra and not target_has_extra then
+    return nil
+  end
+  return wang_has_extra and "teach" or "ask"
+end
+
+local function TeachRandomRecipe(teacher, student)
+  local candidates = GetTeachDiff(teacher, student)
   if #candidates == 0 then
     return false
   end
-  target.components.recipe_mastery:MasterRecipe(candidates[math.random(#candidates)])
+  student.components.recipe_mastery:MasterRecipe(candidates[math.random(#candidates)])
   return true
 end
 
@@ -63,11 +105,28 @@ local function DrainStudentSanity(inst, amount)
     return
   end
   inst.components.sanity:DoDelta(-amount)
-  inst.sg.statemem.teach_sanity_drained = (inst.sg.statemem.teach_sanity_drained or 0) + amount
+  inst.sg.statemem.recipe_sanity_drained = (inst.sg.statemem.recipe_sanity_drained or 0) + amount
+end
+
+local function StartStudentSanityDrain(inst)
+  inst.sg.statemem.recipe_sanity_drained = 0
+  local per_second = TUNING.WANG.TEACH_SANITY_TOTAL / TUNING.WANG.TEACH_DURATION
+  inst.sg.statemem.recipe_sanity_task = inst:DoPeriodicTask(1, function(player)
+    if player.sg.statemem.recipe_is_student then
+      DrainStudentSanity(player, per_second)
+    end
+  end, 1)
+end
+
+local function StopStudentSanityDrain(inst)
+  if inst.sg.statemem.recipe_sanity_task ~= nil then
+    inst.sg.statemem.recipe_sanity_task:Cancel()
+    inst.sg.statemem.recipe_sanity_task = nil
+  end
 end
 
 local function FinishStudentSanityDrain(inst)
-  local drained = inst.sg.statemem.teach_sanity_drained or 0
+  local drained = inst.sg.statemem.recipe_sanity_drained or 0
   local remain = TUNING.WANG.TEACH_SANITY_TOTAL - drained
   if remain > 0 then
     DrainStudentSanity(inst, remain)
@@ -75,11 +134,11 @@ local function FinishStudentSanityDrain(inst)
 end
 
 local TEACH_RECIPE = AddAction("TEACH_RECIPE", STRINGS.ACTIONS.TEACH_RECIPE, function(act)
-  local teacher, target = act.doer, act.target
-  if not CanTeach(teacher, target) then
+  local teacher, student = act.doer, act.target
+  if not CanTeach(teacher, student) or GetExchangeMode(teacher, student) ~= "teach" then
     return false
   end
-  if #GetTeachDiff(teacher, target) == 0 then
+  if #GetTeachDiff(teacher, student) == 0 then
     return false, "TEACH_NONE"
   end
   return true
@@ -87,25 +146,45 @@ end)
 TEACH_RECIPE.priority = 5
 TEACH_RECIPE.distance = 3
 
--- 采集器（双方都要有掌握组件；可传授开关读取自副本网络变量）
+local ASK_RECIPE = AddAction("ASK_RECIPE", STRINGS.ACTIONS.ASK_RECIPE, function(act)
+  local student, teacher = act.doer, act.target
+  if not CanAsk(student, teacher) or GetExchangeMode(student, teacher) ~= "ask" then
+    return false
+  end
+  if #GetTeachDiff(teacher, student) == 0 then
+    return false, "ASK_NONE"
+  end
+  return true
+end)
+ASK_RECIPE.priority = 5
+ASK_RECIPE.distance = 3
+
+-- 传授 / 请教都只占右键动作槽，并由双方已掌握集合关系决定唯一动作。
 AddComponentAction("SCENE", "recipe_mastery", function(inst, doer, actions, right)
-  if doer == nil or inst == doer or doer:HasTag("playerghost") or inst:HasTag("playerghost") then
+  if not right or doer == nil or inst == doer
+      or doer.prefab ~= "wang"
+      or doer:HasTag("playerghost") or inst:HasTag("playerghost") then
     return
   end
+
   local doer_mastery = doer.replica.recipe_mastery
   local target_mastery = inst.replica.recipe_mastery
-  if doer_mastery == nil or target_mastery == nil then
+  if doer_mastery == nil or target_mastery == nil or not doer_mastery:IsTeachingEnabled() then
     return
   end
-  if not doer_mastery:IsTeachingEnabled() then
-    return
+
+  local mode = GetExchangeMode(doer, inst)
+  if mode == "teach" then
+    table.insert(actions, ACTIONS.TEACH_RECIPE)
+  elseif mode == "ask" then
+    table.insert(actions, ACTIONS.ASK_RECIPE)
   end
-  table.insert(actions, ACTIONS.TEACH_RECIPE)
 end)
 
--- 被传授方：不带 busy，保持原版 Wilson 的 locomote / action 中断能力。
-local studentState = State {
-  name = STUDENT_STATE,
+-- 被发起方：不带 busy，保持原版 Wilson 的 locomote / action 中断能力。
+-- 是否承担“学生”身份由 data.is_student 决定，因此传授与请教可以共用这一状态。
+local partnerState = State {
+  name = PARTNER_STATE,
   tags = { "idle" },
 
   onenter = function(inst, data)
@@ -114,17 +193,14 @@ local studentState = State {
     PlayTeachSit(inst)
 
     if TheWorld.ismastersim then
-      inst.sg.statemem.teacher = data ~= nil and data.teacher or nil
-      inst.sg.statemem.teach_sanity_drained = 0
-      local per_second = TUNING.WANG.TEACH_SANITY_TOTAL / TUNING.WANG.TEACH_DURATION
-      inst.sg.statemem.teach_sanity_task = inst:DoPeriodicTask(1, function(player)
-        if player.sg.currentstate.name == STUDENT_STATE then
-          DrainStudentSanity(player, per_second)
-        end
-      end, 1)
+      inst.sg.statemem.initiator = data ~= nil and data.initiator or nil
+      inst.sg.statemem.recipe_is_student = data ~= nil and data.is_student == true
+      if inst.sg.statemem.recipe_is_student then
+        StartStudentSanityDrain(inst)
+      end
     end
 
-    -- 教师在 10 秒整负责结算；这里多留 1 秒只作异常兜底，避免双方 timeout 同帧竞争。
+    -- 发起方在 10 秒整负责结算；这里多留 1 秒只作异常兜底，避免双方 timeout 同帧竞争。
     inst.sg:SetTimeout(TUNING.WANG.TEACH_DURATION + 1)
   end,
 
@@ -137,30 +213,31 @@ local studentState = State {
       return
     end
 
-    if inst.sg.statemem.teach_sanity_task ~= nil then
-      inst.sg.statemem.teach_sanity_task:Cancel()
-      inst.sg.statemem.teach_sanity_task = nil
-    end
+    StopStudentSanityDrain(inst)
 
-    if not inst.sg.statemem.teach_exit_silent then
-      local teacher = inst.sg.statemem.teacher
-      if teacher ~= nil and teacher:IsValid() then
-        teacher:PushEvent("wang_teach_interrupted", { target = inst })
+    if not inst.sg.statemem.recipe_exit_silent then
+      local initiator = inst.sg.statemem.initiator
+      if initiator ~= nil and initiator:IsValid() then
+        initiator:PushEvent("wang_recipe_interrupted", { target = inst })
       end
     end
   end,
 }
 
--- 邀请方：busy + nointerrupt，不能靠移动/动作/受击主动或被动打断普通流程。
-local teacherState = State {
-  name = TEACHER_STATE,
+-- 发起方：busy + nointerrupt，不能靠移动/动作/受击主动或被动打断普通流程。
+-- TEACH_RECIPE 时发起方是教师；ASK_RECIPE 时发起方是学生。
+local initiatorState = State {
+  name = INITIATOR_STATE,
   tags = { "doing", "busy", "nointerrupt" },
-  server_states = { TEACHER_STATE },
+  server_states = { INITIATOR_STATE },
 
   onenter = function(inst)
     local action = inst:GetBufferedAction()
     local target = action ~= nil and action.target or nil
+    local is_ask = action ~= nil and action.action == ACTIONS.ASK_RECIPE
     inst.sg.statemem.target = target
+    inst.sg.statemem.is_ask = is_ask
+    inst.sg.statemem.recipe_is_student = is_ask
 
     inst.components.locomotor:Stop()
     PlayTeachSit(inst)
@@ -169,7 +246,7 @@ local teacherState = State {
     end
 
     if not TheWorld.ismastersim then
-      -- 清掉同名状态的旧缓存，避免连续传授时误把上一次服务端状态当成已确认。
+      -- 清掉同名状态的旧缓存，避免连续交互时误把上一次服务端状态当成已确认。
       if inst.player_classified ~= nil then
         inst.player_classified.currentstate:set_local(0)
       end
@@ -186,12 +263,21 @@ local teacherState = State {
       return
     end
 
-    if inst.components.talker ~= nil then
+    if is_ask then
+      StartStudentSanityDrain(inst)
+      -- 请教时目标是教师；用通用教学台词，不要求其它角色额外提供专属文本。
+      if target.components.talker ~= nil then
+        target.components.talker:Say(STRINGS.CHARACTERS.GENERIC.ANNOUNCE.TEACH_RECIPE)
+      end
+    elseif inst.components.talker ~= nil then
       inst.components.talker:Say(STRINGS.CHARACTERS.WANG.ANNOUNCE.TEACH_RECIPE)
     end
 
     target:ForceFacePoint(inst.Transform:GetWorldPosition())
-    target.sg:GoToState(STUDENT_STATE, { teacher = inst })
+    target.sg:GoToState(PARTNER_STATE, {
+      initiator = inst,
+      is_student = not is_ask,
+    })
     inst.sg:SetTimeout(TUNING.WANG.TEACH_DURATION)
   end,
 
@@ -204,13 +290,13 @@ local teacherState = State {
       inst.sg.statemem.server_confirmed = true
     elseif inst.sg.statemem.server_confirmed
         or (inst.sg:GetTimeInState() >= 1 and inst:GetBufferedAction() == nil) then
-      -- 服务端已经结束/拒绝本次传授，立即解除客户端 busy；首次确认留 1 秒网络余量。
+      -- 服务端已经结束/拒绝本次交互，立即解除客户端 busy；首次确认留 1 秒网络余量。
       inst.sg:GoToState("idle", true)
     end
   end,
 
   events = {
-    EventHandler("wang_teach_interrupted", function(inst, data)
+    EventHandler("wang_recipe_interrupted", function(inst, data)
       if TheWorld.ismastersim and data ~= nil and data.target == inst.sg.statemem.target then
         inst.sg.statemem.interrupted = true
         if inst.components.talker ~= nil then
@@ -228,41 +314,52 @@ local teacherState = State {
     end
 
     local target = inst.sg.statemem.target
+    local is_ask = inst.sg.statemem.is_ask == true
     if target == nil or not target:IsValid() or target.sg == nil
-        or target.sg.currentstate.name ~= STUDENT_STATE
-        or target.sg.statemem.teacher ~= inst then
+        or target.sg.currentstate.name ~= PARTNER_STATE
+        or target.sg.statemem.initiator ~= inst
+        or target.sg.statemem.recipe_is_student ~= (not is_ask) then
       inst.sg.statemem.interrupted = true
       inst.sg:GoToState("idle")
       return
     end
 
-    FinishStudentSanityDrain(target)
-    TeachRandomRecipe(inst, target)
+    local teacher = is_ask and target or inst
+    local student = is_ask and inst or target
+    FinishStudentSanityDrain(student)
+    TeachRandomRecipe(teacher, student)
 
-    target.sg.statemem.teach_exit_silent = true
+    target.sg.statemem.recipe_exit_silent = true
     target.sg:GoToState("idle")
     inst.sg.statemem.completed = true
     inst.sg:GoToState("idle")
   end,
 
   onexit = function(inst)
-    if not TheWorld.ismastersim or inst.sg.statemem.completed then
+    if not TheWorld.ismastersim then
+      return
+    end
+
+    StopStudentSanityDrain(inst)
+    if inst.sg.statemem.completed then
       return
     end
 
     local target = inst.sg.statemem.target
     if target ~= nil and target:IsValid() and target.sg ~= nil
-        and target.sg.currentstate.name == STUDENT_STATE
-        and target.sg.statemem.teacher == inst then
-      target.sg.statemem.teach_exit_silent = true
+        and target.sg.currentstate.name == PARTNER_STATE
+        and target.sg.statemem.initiator == inst then
+      target.sg.statemem.recipe_exit_silent = true
       target.sg:GoToState("idle")
     end
   end,
 }
 
-AddStategraphState("wilson", teacherState)
-AddStategraphState("wilson_client", teacherState)
-AddStategraphState("wilson", studentState)
-AddStategraphState("wilson_client", studentState)
-AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.TEACH_RECIPE, TEACHER_STATE))
-AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.TEACH_RECIPE, TEACHER_STATE))
+AddStategraphState("wilson", initiatorState)
+AddStategraphState("wilson_client", initiatorState)
+AddStategraphState("wilson", partnerState)
+AddStategraphState("wilson_client", partnerState)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.TEACH_RECIPE, INITIATOR_STATE))
+AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.TEACH_RECIPE, INITIATOR_STATE))
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.ASK_RECIPE, INITIATOR_STATE))
+AddStategraphActionHandler("wilson_client", ActionHandler(ACTIONS.ASK_RECIPE, INITIATOR_STATE))

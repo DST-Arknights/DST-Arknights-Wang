@@ -154,7 +154,7 @@ local function PassiveDetonateCheck(inst)
 end
 
 local function StartProximityTrap(inst)
-  if inst._proxTask == nil then
+  if inst._proxTask == nil and not inst:IsAsleep() then
     -- 首次检测延后一整个周期：连星会在 0.5 秒内完成外围落子并转连接态，可在第一次扫描前关闭任务。
     inst._proxTask = inst:DoPeriodicTask(PROX_CHECK_INTERVAL, PassiveDetonateCheck, PROX_CHECK_INTERVAL)
   end
@@ -164,6 +164,19 @@ local function StopProximityTrap(inst)
   if inst._proxTask ~= nil then
     inst._proxTask:Cancel()
     inst._proxTask = nil
+  end
+end
+
+local function OnEntitySleep(inst)
+  -- DoPeriodicTask 挂在全局 scheduler 上，不会随实体休眠自动暂停。
+  -- 睡眠区域没有活跃目标，停止部署态接近扫描，避免每枚棋子每秒继续 FindEntity。
+  StopProximityTrap(inst)
+end
+
+local function OnEntityWake(inst)
+  -- 仅普通部署态需要陷阱扫描；连接态在 EnterLinkState 后永久关闭该任务。
+  if inst._isdeployed and not inst._islinked then
+    StartProximityTrap(inst)
   end
 end
 
@@ -583,6 +596,10 @@ local function fn()
   -- 部署/连接状态存档；普通部署态读档后自动恢复陷阱，连星态随后关闭；electricconnector 自行重连
   inst.OnSave = OnSave
   inst.OnLoad = OnLoad
+
+  -- 周期任务按实体休眠生命周期启停；原版大量 prefab 也用此模式避免休眠区继续跑 scheduler 任务。
+  inst.OnEntitySleep = OnEntitySleep
+  inst.OnEntityWake = OnEntityWake
 
   -- ────────────────────────────────────────────────────────
   -- 引爆方法（挂在棋子实例上，仅部署态有效）

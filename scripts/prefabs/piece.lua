@@ -388,13 +388,25 @@ local function OnUnequip(inst, owner)
 end
 
 -- ────────────────────────────────────────────────────────
--- 部署态被锤子 / boss 摧毁 → 被动引爆（消耗品，不回收）
+-- 部署态被锤击 → 回收成普通黑子。
+-- 锤击只作为一次性交互触发，不走生命/伤害结算；棋子本体移除后生成普通物品态黑子。
+-- boss / 自然灾害等其它摧毁路径仍可通过外部调用 PassiveExplode 触发被动引爆。
 -- ────────────────────────────────────────────────────────
 local function OnHammered(inst, worker)
-  if inst._isdeployed then
-    inst:PassiveExplode(worker, 1)  -- 被动引爆倍率 1（无技能加成）
-  else
+  if not inst._isdeployed then
     inst:Remove()
+    return
+  end
+
+  local x, y, z = inst.Transform:GetWorldPosition()
+  SpawnFxAt("cavehole_flick", x, y, z)
+
+  -- 先移除部署实体，让 onremove 统一清理占格、连线、陷阱任务与部署数量统计。
+  inst:Remove()
+
+  local piece = SpawnPrefab("piece")
+  if piece ~= nil then
+    piece.Transform:SetPosition(x, y, z)
   end
 end
 
@@ -573,7 +585,7 @@ local function fn()
   -- 投掷飞行中播放旋转动画，并在目标格生成隐藏最终棋子（避免连续投掷堆叠）
   inst.components.complexprojectile:SetOnLaunch(OnTossLaunch)
 
-  -- 部署态可被锤子 / boss 摧毁
+  -- 部署态可被锤击回收；workable 只提供一次性 HAMMER 交互，不承担伤害结算。
   inst:AddComponent("workable")
   inst.components.workable:SetWorkAction(ACTIONS.HAMMER)
   inst.components.workable:SetWorkLeft(1)
@@ -624,7 +636,7 @@ local function fn()
     inst:Remove()
   end
 
-  -- 被动引爆（被锤子 / boss 摧毁时触发）：范围伤害，仅单特效，不摧毁建造物
+  -- 被动引爆（boss / 自然灾害等外部摧毁路径触发）：范围伤害，仅单特效，不摧毁建造物
   -- multiplier: 倍率，默认 1（被动引爆无技能加成）
   inst.PassiveExplode = function(_, source, multiplier)
     if not inst._isdeployed then return end

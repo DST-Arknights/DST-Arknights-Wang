@@ -1,7 +1,7 @@
 -- 望的天赋配置
 -- 被动【铸子】：每 interval 秒生成一枚黑子，按外挂棋盒、背包棋盒、普通背包顺序存放
 -- 参考物品包 RegisterArkTalent + 重岳 chongyue_talent.lua
-
+table.insert(Assets, Asset("ATLAS", "images/wang_talent.xml"))
 local PieceResource = require "wang_piece_resource"
 
 local function GiveGeneratedPiece(inst, item)
@@ -40,8 +40,8 @@ end
 
 RegisterArkTalent({
   id    = "wang_talent_zhuzi",
-  atlas = "images/inventoryimages/piece.xml",
-  image = "piece.tex",
+  atlas = "images/wang_talent.xml",
+  image = "talent_1.tex",
   name  = STRINGS.UI.ARK_TALENT.NAMES.WANG[1],
   levels = {
     {

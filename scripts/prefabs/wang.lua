@@ -19,6 +19,11 @@ local prefabs = {
 }
 
 local start_inv = {}
+for k, v in pairs(TUNING.GAMEMODE_STARTING_ITEMS) do
+  start_inv[string.lower(k)] = v.WANG
+end
+
+prefabs = FlattenTree({ prefabs, start_inv }, true)
 
 -- ════════════════════════════════════════════════════════
 -- 技能：出生时安装
@@ -226,6 +231,8 @@ end
 -- 仅服务端执行：组件 / 属性 / 玩法
 -- ════════════════════════════════════════════════════════
 local function master_post_init(inst)
+  inst.starting_inventory = start_inv[TheNet:GetServerGameMode()] or start_inv.default
+
   BindVoice(inst, "wang")
   inst.MiniMapEntity:SetIcon("wang.tex")
   -- 基础属性（生命上限会随成长逐渐降低，最低为 1）
@@ -313,4 +320,4 @@ local function master_post_init(inst)
   inst:ListenForEvent("dismounted", OnDismounted)
 end
 
-return MakePlayerCharacter("wang", prefabs, assets, common_post_init, master_post_init, start_inv)
+return MakePlayerCharacter("wang", prefabs, assets, common_post_init, master_post_init)

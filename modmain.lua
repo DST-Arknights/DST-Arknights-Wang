@@ -282,6 +282,6 @@ containers.params["piece_box"] = {
   end,
 }
 
--- 初始物品（兽形棋盒）：望出生自带，可拾取进背包 / 放下跟随
-local StartItems = { "piece_box" }
+-- 初始物品：拈子剑与兽形棋盒；云兽可拾取进背包 / 放下跟随
+local StartItems = { "piece_box", "nianzi_sword" }
 TUNING.GAMEMODE_STARTING_ITEMS.DEFAULT.WANG = StartItems

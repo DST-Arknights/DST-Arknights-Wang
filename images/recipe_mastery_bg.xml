@@ -2,7 +2,7 @@
 <Atlas>
 	<Texture filename="recipe_mastery_bg.tex" />
 	<Elements>
-		<Element name="mastered.tex" u1="0.501" u2="0.999" v2="0.999" v1="0.001" variant="" />
-		<Element name="mastering.tex" u1="0.001" u2="0.499" v2="0.999" v1="0.001" variant="" />
+		<Element name="mastered.tex" u1="0.001" u2="0.499" v2="0.999" v1="0.001" variant="" />
+		<Element name="mastering.tex" u1="0.501" u2="0.999" v2="0.999" v1="0.001" variant="" />
 	</Elements>
 </Atlas>

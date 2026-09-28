@@ -19,11 +19,13 @@ local function FormatPercent(value)
   return FormatNumber((value or 0) * 100)
 end
 
-local function WangZhuziDesc(params)
+local function WangZhuziDesc(talent)
+  local params = talent:GetLevelParams()
   return string.format(STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[1], FormatNumber(params.interval))
 end
 
-local function WangYingjieDesc(params)
+local function WangYingjieDesc(talent)
+  local params = talent:GetLevelParams()
   local reduction = FormatPercent(params.damageReductionPerPiece)
   if params.lethalProtection then
     return string.format(

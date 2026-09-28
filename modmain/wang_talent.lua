@@ -7,10 +7,6 @@ table.insert(Assets, Asset("ATLAS", "images/wang_talent.xml"))
 local PieceResource = require "wang_piece_resource"
 local PieceLimit = require "wang_piece_limit"
 
-local function GiveGeneratedPiece(inst, item)
-  return PieceResource.Give(inst, item)
-end
-
 local function FormatNumber(value)
   return string.format("%g", value or 0)
 end
@@ -38,11 +34,15 @@ local function WangYingjieDesc(talent)
   return string.format(STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[2][1], reduction)
 end
 
-local function StartZhuzi(talent)
+local function StopZhuzi(talent)
   if talent._zhuzi_task then
     talent._zhuzi_task:Cancel()
     talent._zhuzi_task = nil
   end
+end
+
+local function StartZhuzi(talent)
+  StopZhuzi(talent)
   if not talent:IsUnlocked() then
     return
   end
@@ -55,17 +55,10 @@ local function StartZhuzi(talent)
       return
     end
     local item = SpawnPrefab("piece")
-    if not GiveGeneratedPiece(inst, item) then
+    if not PieceResource.Give(inst, item) then
       item:Remove() -- 背包满：黑子消失，等下一次生成
     end
   end)
-end
-
-local function StopZhuzi(talent)
-  if talent._zhuzi_task then
-    talent._zhuzi_task:Cancel()
-    talent._zhuzi_task = nil
-  end
 end
 
 RegisterArkTalent({
@@ -107,7 +100,6 @@ local function StopYingjieGuard(talent)
     talent._yingjie_guard_task:Cancel()
     talent._yingjie_guard_task = nil
   end
-  talent._yingjie_guard_active = nil
   if talent._yingjie_fx ~= nil then
     if talent._yingjie_fx:IsValid() and talent._yingjie_fx.kill_fx ~= nil then
       talent._yingjie_fx:kill_fx()
@@ -117,9 +109,6 @@ local function StopYingjieGuard(talent)
 end
 
 local function StartYingjieGuard(talent, duration)
-  StopYingjieGuard(talent)
-  talent._yingjie_guard_active = true
-
   local inst = talent.inst
   local fx = SpawnPrefab("forcefieldfx")
   if fx ~= nil then
@@ -131,13 +120,7 @@ local function StartYingjieGuard(talent, duration)
 
   talent._yingjie_guard_task = inst:DoTaskInTime(duration, function()
     talent._yingjie_guard_task = nil
-    talent._yingjie_guard_active = nil
-    if talent._yingjie_fx ~= nil then
-      if talent._yingjie_fx:IsValid() and talent._yingjie_fx.kill_fx ~= nil then
-        talent._yingjie_fx:kill_fx()
-      end
-      talent._yingjie_fx = nil
-    end
+    StopYingjieGuard(talent)
   end)
 end
 
@@ -199,20 +182,17 @@ local function OnYingjieInstall(talent)
   end
 
   -- externalabsorbmodifiers 会在 health.redirect 之后结算，因此致命判断前先按当前落子数刷新减伤。
-  -- redirect 不是函数成员，无法走 HookFunctionWhileUnlocked；这里只安装一次代理，锁定时直接旁路。
-  talent._yingjie_previous_redirect = health.redirect
-  talent._yingjie_redirect = function(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
-    local previous = talent._yingjie_previous_redirect
-    if previous ~= nil and previous(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb) then
+  talent:HookFunctionWhileUnlocked(health, "redirect", function(next, player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
+    if next(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb) then
       return true
     end
-    if not talent:IsUnlocked() or amount >= 0 or ignore_absorb then
+    if amount >= 0 or ignore_absorb then
       return false
     end
 
     RefreshYingjieDamageReduction(talent)
 
-    if talent._yingjie_guard_active then
+    if talent._yingjie_guard_task ~= nil then
       PlayYingjieShieldHit(talent)
       return true
     end
@@ -226,29 +206,17 @@ local function OnYingjieInstall(talent)
 
     StartYingjieGuard(talent, params.guardDuration or 0)
     return true
-  end
-  health.redirect = talent._yingjie_redirect
+  end)
 
   -- 保护窗口内的普通战斗攻击在护甲结算前直接挡掉；解锁/锁定/读档生命周期交给框架。
   if inst.components.combat ~= nil then
     talent:HookFunctionWhileUnlocked(inst.components.combat, "GetAttacked", function(next, self, ...)
-      if talent._yingjie_guard_active then
+      if talent._yingjie_guard_task ~= nil then
         PlayYingjieShieldHit(talent)
         return true
       end
       return next(self, ...)
     end)
-  end
-end
-
-local function OnYingjieUnlocked(talent)
-  RefreshYingjieDamageReduction(talent)
-end
-
-local function OnYingjieLevelChange(talent)
-  RefreshYingjieDamageReduction(talent)
-  if not talent:GetLevelParams().lethalProtection then
-    StopYingjieGuard(talent)
   end
 end
 
@@ -258,16 +226,6 @@ local function OnYingjieLocked(talent)
   if health ~= nil then
     health.externalabsorbmodifiers:RemoveModifier(talent, YINGJIE_ABSORB_KEY)
   end
-end
-
-local function OnYingjieRemove(talent)
-  OnYingjieLocked(talent)
-  local health = talent.inst.components.health
-  if health ~= nil and health.redirect == talent._yingjie_redirect then
-    health.redirect = talent._yingjie_previous_redirect
-  end
-  talent._yingjie_redirect = nil
-  talent._yingjie_previous_redirect = nil
 end
 
 RegisterArkTalent({
@@ -296,8 +254,7 @@ RegisterArkTalent({
     },
   },
   OnInstall = OnYingjieInstall,
-  OnUnlocked = OnYingjieUnlocked,
-  OnLevelChange = OnYingjieLevelChange,
+  OnUnlocked = RefreshYingjieDamageReduction,
+  OnLevelChange = RefreshYingjieDamageReduction,
   OnLocked = OnYingjieLocked,
-  OnRemove = OnYingjieRemove,
 })

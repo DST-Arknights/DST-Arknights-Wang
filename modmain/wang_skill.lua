@@ -1101,16 +1101,16 @@ local skillConfig = {
     -- 预声明选择器（RegisterTargetSelector 声明于本文件顶部）
     targetSelector = "wang_piece_aoe",
     levels = { {
-      activationEnergy = 5,       -- 消耗 SP（设定：5→3→1）
-      maxActivationStacks = 5,    -- 可储存次数（设定：5→7→10）
+      activationEnergy = 15,       -- 消耗 SP（设定：15→13→11）
+      maxActivationStacks = 3,    -- 可储存次数（设定：3→5→8）
       params = { damageMultiplier = 0.9 },
     }, {
-      activationEnergy = 3,
-      maxActivationStacks = 7,
+      activationEnergy = 13,
+      maxActivationStacks = 4,
       params = { damageMultiplier = 1.1 },
     }, {
-      activationEnergy = 1,
-      maxActivationStacks = 10,
+      activationEnergy = 11,
+      maxActivationStacks = 6,
       params = { damageMultiplier = 1.3 },
     } },
   },
@@ -1130,12 +1130,12 @@ local skillConfig = {
     ActivateTest = OnWangSkill2ActivateTest,
     OnActivate = OnWangSkill2Activate,
     levels = { {
-      activationEnergy = 10,      -- 消耗 SP（设定：10~5）
-      maxActivationStacks = 4,    -- 可储存次数（设定：4~6）
+      activationEnergy = 80,      -- 消耗 SP（设定：80→65）
+      maxActivationStacks = 1,    -- 可储存次数（设定：1→2）
       params = {},
     }, {
-      activationEnergy = 5,
-      maxActivationStacks = 6,
+      activationEnergy = 65,
+      maxActivationStacks = 2,
       params = {},
     } },
   },
@@ -1156,8 +1156,7 @@ local skillConfig = {
     ActivateTest = OnWangSkill3ActivateTest,
     OnActivate = OnWangSkill3Activate,
     levels = { {
-      -- activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
-      activationEnergy = 10,
+      activationEnergy = 181,     -- 消耗 SP（设定：181，开启后持续 1 SP/秒）
       maxActivationStacks = 1,
       params = {
         damageMultiplier = 2,

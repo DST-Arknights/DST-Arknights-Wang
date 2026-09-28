@@ -81,9 +81,9 @@ local function SpawnHitEnemyFx(ent)
   SpawnFxAt("fx_dock_pop", x, y, z)
 end
 
--- 主动爆炸对周围可作业物施加固定工作量，不含已部署棋子，避免连锁引爆。
--- 等价于多用镐斧连续作业 5 次；走 WorkedBy_Internal 保留 workmultiplier / worked / onwork 等标准流程，
--- 但不受施法者当前手持工具的 tough-work / recoil 门槛影响（爆炸本身就是工作来源）。
+-- 主动爆炸对周围可作业物施加固定基础工作量，不含已部署棋子，避免连锁引爆。
+-- 基础等价于多用镐斧连续作业 5 次，并乘棋子部署时保存的攻击倍率 _damageMultiplier；
+-- 走 WorkedBy_Internal 保留 workmultiplier / worked / onwork 等标准流程，且不受施法者当前手持工具影响。
 local DESTROY_TAGS = { "CHOP_workable", "MINE_workable", "HAMMER_workable", "DIG_workable" }
 local EXPLOSION_WORK_AMOUNT = 5 * TUNING.MULTITOOL_AXE_PICKAXE_EFFICIENCY
 local function DestroySurroundingBuildings(inst, source, range)
@@ -93,7 +93,7 @@ local function DestroySurroundingBuildings(inst, source, range)
   for _, ent in ipairs(ents) do
     if ent.components.workable ~= nil and ent.components.workable:CanBeWorked() then
       SpawnPrefab("collapse_small").Transform:SetPosition(ent.Transform:GetWorldPosition())
-      ent.components.workable:WorkedBy_Internal(source or inst, EXPLOSION_WORK_AMOUNT)
+      ent.components.workable:WorkedBy_Internal(source or inst, EXPLOSION_WORK_AMOUNT * inst._damageMultiplier)
     end
   end
 end

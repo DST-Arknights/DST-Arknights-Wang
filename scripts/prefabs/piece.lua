@@ -288,11 +288,20 @@ local function DeclareCellOccupied(inst)
   return ApplyCellOccupiedState(inst)
 end
 
+-- 占格后棋子已经不再是普通可堆叠物品。直接卸载 stackable 会同步移除 _stackable 标签，
+-- 从组件与标签两层避开第三方地面自动堆叠；锤回收时会生成新的普通 piece，无需恢复组件。
+local function DisableStacking(inst)
+  if inst.components.stackable ~= nil then
+    inst:RemoveComponent("stackable")
+  end
+end
+
 -- 延迟落子 / 投掷使用：调用前必须先确定 Transform；随后只声明“我占当前格”。
 local function ReserveDeployCell(inst)
   if inst._isdeployed or not DeclareCellOccupied(inst) then
     return false
   end
+  DisableStacking(inst)
   inst.persists = false
   inst.components.inventoryitem.canbepickedup = false
   inst.components.workable:SetWorkable(false)
@@ -307,6 +316,7 @@ local function SetDeployedState(inst, options)
   if not DeclareCellOccupied(inst) then
     return false
   end
+  DisableStacking(inst)
   options = options or {}
 
   inst._isdeployed = true
@@ -435,6 +445,13 @@ local function CanTossInWorld(_, _, pos)
   return not Grid:IsOccupied(gx, gz)
 end
 
+-- 原版 Stackable:Put 会先走 CanStackWith，并支持 prefab 自定义 stackable_CanStackWithFn。
+-- 已占格即表示处于隐藏预部署或正式部署态：两者都不能再被任何常规堆叠逻辑合并。
+-- 普通物品态 _wang_cell_occupied=false，仍保持原有背包/地面堆叠行为。
+local function CanStackPieceWith(inst, item)
+  return not inst._wang_cell_occupied:value() and not item._wang_cell_occupied:value()
+end
+
 local function CopyDeploySnapshot(source, target)
   target._baseDamage = source._baseDamage
   target._eliteBonusDamage = source._eliteBonusDamage
@@ -546,6 +563,7 @@ local function fn()
 
   -- 占格是棋子自身的联网状态。位置必须先确定，再把此位设为 true；客户端 dirty 后按当前 Transform 登记本地网格。
   inst._wang_cell_occupied = net_bool(inst.GUID, "piece._wang_cell_occupied", "piece_cell_occupied_dirty")
+  inst.stackable_CanStackWithFn = CanStackPieceWith
   inst:ListenForEvent("piece_cell_occupied_dirty", OnCellOccupiedDirty)
   inst:ListenForEvent("onremove", OnGridEntityRemove)
 
@@ -579,7 +597,8 @@ local function fn()
 
   inst:AddComponent("inventoryitem")
 
-  -- 可堆叠（系统最大堆叠数）
+  -- 可堆叠（系统最大堆叠数）。部署/预部署态通过原版 CanStackWith 扩展点拒绝参与堆叠，
+  -- 兼容会直接调用 stackable:Put 的第三方自动堆叠逻辑。
   inst:AddComponent("stackable")
   inst.components.stackable.maxsize = TUNING.STACK_SIZE_PELLET
 

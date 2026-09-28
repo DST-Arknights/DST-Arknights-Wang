@@ -14,7 +14,9 @@ local assets = {
   Asset("ATLAS", "images/names_gold_wang.xml"),
 }
 
-local prefabs = {}
+local prefabs = {
+  "forcefieldfx",
+}
 
 local start_inv = {}
 
@@ -33,9 +35,12 @@ end
 
 local function OnNewSpawn(inst)
   InstallDefaultSkills(inst)
-  -- 天赋：铸子（被动，出生即有）
+  -- 天赋：铸子出生即有；应劫预装后由精英阶段自动解锁。
   if inst.components.ark_talent:GetTalent("wang_talent_zhuzi") == nil then
     inst.components.ark_talent:AddTalent("wang_talent_zhuzi")
+  end
+  if inst.components.ark_talent:GetTalent("wang_talent_yingjie") == nil then
+    inst.components.ark_talent:AddTalent("wang_talent_yingjie")
   end
 end
 
@@ -267,6 +272,10 @@ local function master_post_init(inst)
   inst.components.ark_talent:DeclareBuiltin("wang_talent_zhuzi", {
     requiredElite = 1,                       -- 精英0 解锁（出生即有）
     eliteLevelMap = { [1] = 1, [2] = 2, [3] = 3 }, -- 精英0→1级，精英1→2级，精英2→3级
+  })
+  inst.components.ark_talent:DeclareBuiltin("wang_talent_yingjie", {
+    requiredElite = 2,                       -- 精英1 解锁
+    eliteLevelMap = { [2] = 1, [3] = 2 },   -- 精英1→1级，精英2→2级
   })
 
   -- 配方掌握（全玩家 PostInit 已挂组件；望额外启用自动掌握 / 精神增益）

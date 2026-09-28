@@ -180,6 +180,21 @@ msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3"
 msgid "Generate a Black Stone in your inventory every 10 seconds."
 msgstr "每10秒在背包中生成一枚黑子。"
 
+#. STRINGS.UI.ARK_TALENT.NAMES.WANG.2
+msgctxt "STRINGS.UI.ARK_TALENT.NAMES.WANG.2"
+msgid "Answer Calamity"
+msgstr "应劫"
+
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.1
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.1"
+msgid "-Each deployed Black Stone reduces damage taken by 0.5%."
+msgstr "-每枚已落的黑子使自身收到的伤害降低0.5%"
+
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.2
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.2"
+msgid "-Each deployed Black Stone reduces damage taken by 0.5%.\n-On taking lethal damage, consume 1 deployed Black Stone or 3 carried Black Stones to negate the damage and gain 0.5 seconds of protection."
+msgstr "-每枚已落的黑子使自身收到的伤害降低0.5%\n-受到致命伤害时，消耗1枚已落黑子或者携带的3枚黑子，抵挡此次伤害并获得0.5秒保护。"
+
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES"
 msgid "No deployed stones in range"

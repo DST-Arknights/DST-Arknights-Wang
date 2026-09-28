@@ -10,6 +10,22 @@ local function IsOlder(a, b)
   return a._deployOrder < b._deployOrder
 end
 
+local function GetOwnerPieces(self, deployer)
+  local userid = type(deployer) == "string" and deployer or deployer ~= nil and deployer.userid or nil
+  return userid ~= nil and self.piecesByOwner[userid] or nil
+end
+
+local function RemovePiece(piece)
+  if piece == nil or not piece:IsValid() then
+    return false
+  end
+  if not piece:IsAsleep() then
+    SpawnPrefab("cavehole_flick").Transform:SetPosition(piece.Transform:GetWorldPosition())
+  end
+  piece:Remove()
+  return true
+end
+
 function PieceLimit:GetLimit(deployer)
   local elite = deployer.components.ark_elite
   if elite == nil then
@@ -48,12 +64,30 @@ function PieceLimit:Register(piece)
     if #pieces > limit then
       table.sort(pieces, IsOlder)
       while #pieces > limit do
-        local oldest = pieces[1]
-        SpawnPrefab("cavehole_flick").Transform:SetPosition(oldest.Transform:GetWorldPosition())
-        oldest:Remove()
+        if not RemovePiece(pieces[1]) then
+          table.remove(pieces, 1)
+        end
       end
     end
   end
+end
+
+function PieceLimit:GetCount(deployer)
+  local pieces = GetOwnerPieces(self, deployer)
+  return pieces ~= nil and #pieces or 0
+end
+
+function PieceLimit:ConsumeOne(deployer)
+  local pieces = GetOwnerPieces(self, deployer)
+  if pieces == nil or #pieces == 0 then
+    return false
+  end
+
+  table.sort(pieces, IsOlder)
+  while #pieces > 0 and not pieces[1]:IsValid() do
+    table.remove(pieces, 1)
+  end
+  return #pieces > 0 and RemovePiece(pieces[1]) or false
 end
 
 function PieceLimit:Unregister(piece)

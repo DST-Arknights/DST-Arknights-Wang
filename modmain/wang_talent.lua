@@ -273,7 +273,7 @@ end
 RegisterArkTalent({
   id    = "wang_talent_yingjie",
   atlas = "images/wang_talent.xml",
-  image = "talent_1.tex", -- 暂用第一天赋图标
+  image = "talent_2.tex", -- 暂用第一天赋图标
   name  = STRINGS.UI.ARK_TALENT.NAMES.WANG[2],
   levels = {
     {

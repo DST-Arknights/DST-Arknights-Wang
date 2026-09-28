@@ -27,6 +27,14 @@ local function onunequip(inst, owner)
   owner.AnimState:ClearOverrideSymbol("swap_object")
   owner.AnimState:Hide("ARM_carry")
   owner.AnimState:Show("ARM_normal")
+
+  -- 天下劫依赖拈子剑落子；卸下武器时若技能正在持续，立即走技能自身的完整结束流程。
+  if owner.components.ark_skill ~= nil then
+    local skill = owner.components.ark_skill:GetSkill("wang_skill3")
+    if skill ~= nil and skill:IsActivating() then
+      skill:Cancel(true)
+    end
+  end
 end
 
 -- 攻击命中后，复用原版 combat 的范围攻击逻辑：自动排除攻击者自己，并遵循原版目标/PVP判断与伤害计算。

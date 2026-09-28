@@ -92,18 +92,18 @@ msgstr "Unlocked at Elite II\nReach max level and elite up at the Training Room"
 
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.1"
-msgid "-Detonate deployed black stones within range, each dealing %sx stone damage"
-msgstr "-Detonate deployed black stones within range, each dealing %sx stone damage"
+msgid "-Detonate deployed Black Stones within range, each dealing %sx stone damage\n-Store up to %s charges"
+msgstr "-Detonate deployed Black Stones within range, each dealing %sx stone damage\n-Store up to %s charges"
 
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.2"
-msgid "Costs 10 SP\nCan store 4 charges"
-msgstr "Costs 10 SP\nCan store 4 charges"
+msgid "-Place Black Stones at the four corners of the selected square and link all four into a closed ring\n-Store up to %s charges"
+msgstr "-Place Black Stones at the four corners of the selected square and link all four into a closed ring\n-Store up to %s charges"
 
 #. STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3
 msgctxt "STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG.3"
-msgid "Costs 181 SP\nWhile active, drains 1 SP per second"
-msgstr "Costs 10 SP\nGain 40 rounds; sword placements add stones in four directions"
+msgid "-Survey the whole board and bring the selected area under control, gaining %s rounds\n-While active, placements add Black Stones in four directions\n-Added stones deal %sx damage with %sx explosion range\n-Requires Nianzi Sword equipped\n-Store up to %s charges"
+msgstr "-Survey the whole board and bring the selected area under control, gaining %s rounds\n-While active, placements add Black Stones in four directions\n-Added stones deal %sx damage with %sx explosion range\n-Requires Nianzi Sword equipped\n-Store up to %s charges"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
@@ -165,20 +165,10 @@ msgctxt "STRINGS.UI.ARK_TALENT.NAMES.WANG.1"
 msgid "Cast Stone"
 msgstr "Cast Stone"
 
-#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.1
-msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.1"
-msgid "Generate a Black Stone in your inventory every 20 seconds."
-msgstr "Generate a Black Stone in your inventory every 20 seconds."
-
-#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.2
-msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.2"
-msgid "Generate a Black Stone in your inventory every 15 seconds."
-msgstr "Generate a Black Stone in your inventory every 15 seconds."
-
-#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3
-msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1.3"
-msgid "Generate a Black Stone in your inventory every 10 seconds."
-msgstr "Generate a Black Stone in your inventory every 10 seconds."
+#. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1
+msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.1"
+msgid "-Generate a Black Stone in your inventory every %s seconds."
+msgstr "-Generate a Black Stone in your inventory every %s seconds."
 
 #. STRINGS.UI.ARK_TALENT.NAMES.WANG.2
 msgctxt "STRINGS.UI.ARK_TALENT.NAMES.WANG.2"
@@ -187,13 +177,13 @@ msgstr "Answer Calamity"
 
 #. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.1
 msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.1"
-msgid "-Each deployed Black Stone reduces damage taken by 0.5%."
-msgstr "-Each deployed Black Stone reduces damage taken by 0.5%."
+msgid "-Each deployed Black Stone reduces damage taken by %s%%."
+msgstr "-Each deployed Black Stone reduces damage taken by %s%%."
 
 #. STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.2
 msgctxt "STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG.2.2"
-msgid "-Each deployed Black Stone reduces damage taken by 0.5%.\n-On taking lethal damage, consume 1 deployed Black Stone or 3 carried Black Stones to negate the damage and gain 0.5 seconds of protection."
-msgstr "-Each deployed Black Stone reduces damage taken by 0.5%.\n-On taking lethal damage, consume 1 deployed Black Stone or 3 carried Black Stones to negate the damage and gain 0.5 seconds of protection."
+msgid "-Each deployed Black Stone reduces damage taken by %s%%.\n-On taking lethal damage, consume 1 deployed Black Stone or %s carried Black Stones to negate the damage and gain %s seconds of protection."
+msgstr "-Each deployed Black Stone reduces damage taken by %s%%.\n-On taking lethal damage, consume 1 deployed Black Stone or %s carried Black Stones to negate the damage and gain %s seconds of protection."
 
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_NO_PIECES"

@@ -11,6 +11,31 @@ local function GiveGeneratedPiece(inst, item)
   return PieceResource.Give(inst, item)
 end
 
+local function FormatNumber(value)
+  return string.format("%g", value or 0)
+end
+
+local function FormatPercent(value)
+  return FormatNumber((value or 0) * 100)
+end
+
+local function WangZhuziDesc(params)
+  return string.format(STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[1], FormatNumber(params.interval))
+end
+
+local function WangYingjieDesc(params)
+  local reduction = FormatPercent(params.damageReductionPerPiece)
+  if params.lethalProtection then
+    return string.format(
+      STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[2][2],
+      reduction,
+      FormatNumber(params.carriedCost),
+      FormatNumber(params.guardDuration)
+    )
+  end
+  return string.format(STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[2][1], reduction)
+end
+
 local function StartZhuzi(talent)
   if talent._zhuzi_task then
     talent._zhuzi_task:Cancel()
@@ -48,15 +73,15 @@ RegisterArkTalent({
   name  = STRINGS.UI.ARK_TALENT.NAMES.WANG[1],
   levels = {
     {
-      desc   = STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[1][1],
+      desc   = WangZhuziDesc,
       params = { interval = 20 }, -- 精英0：每 20 秒一枚
     },
     {
-      desc   = STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[1][2],
+      desc   = WangZhuziDesc,
       params = { interval = 15 }, -- 精英1：每 15 秒一枚
     },
     {
-      desc   = STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[1][3],
+      desc   = WangZhuziDesc,
       params = { interval = 10 }, -- 精英2：每 10 秒一枚
     },
   },
@@ -250,7 +275,7 @@ RegisterArkTalent({
   name  = STRINGS.UI.ARK_TALENT.NAMES.WANG[2],
   levels = {
     {
-      desc = STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[2][1],
+      desc = WangYingjieDesc,
       params = {
         damageReductionPerPiece = 0.005,
         maxDamageReduction = 0.9,
@@ -258,13 +283,13 @@ RegisterArkTalent({
       },
     },
     {
-      desc = STRINGS.UI.ARK_TALENT.LEVEL_DESC.WANG[2][2],
+      desc = WangYingjieDesc,
       params = {
         damageReductionPerPiece = 0.005,
         maxDamageReduction = 0.9,
         lethalProtection = true,
         carriedCost = 3,
-        guardDuration = 0.5,
+        guardDuration = 1.5,
       },
     },
   },

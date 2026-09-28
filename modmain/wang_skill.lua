@@ -171,20 +171,34 @@ RegisterTargetSelector("wang_piece_aoe", AreaTargetSelector {
 })
 
 -- 技能描述函数：level desc 为空时 skill_desc 回退到 config 层
--- 技能1描述：三级共用模板（LEVEL_DESC.WANG[1] 带 %s 倍率占位）
+-- 技能1：业务倍率来自 params；储存次数属于技能框架 level config。
 local function WangSkill1LevelDesc(skill)
   local params = skill:GetLevelParams()
-  return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1], params.damageMultiplier)
+  local levelConfig = skill:GetLevelConfig()
+  return string.format(
+    STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[1],
+    params.damageMultiplier,
+    levelConfig.maxActivationStacks
+  )
 end
 
--- 技能2描述：二级共用模板
+-- 技能2：玩法本身无额外业务 params，仅动态展示当前等级最大储存次数。
 local function WangSkill2LevelDesc(skill)
-  return STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[2]
+  local levelConfig = skill:GetLevelConfig()
+  return string.format(STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[2], levelConfig.maxActivationStacks)
 end
 
--- 技能3描述：单级模板
+-- 技能3：弹药数 / 储存次数属于 level config，棋子伤害与爆炸范围倍率属于业务 params。
 local function WangSkill3LevelDesc(skill)
-  return STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[3]
+  local params = skill:GetLevelParams()
+  local levelConfig = skill:GetLevelConfig()
+  return string.format(
+    STRINGS.UI.ARK_SKILL.LEVEL_DESC.WANG[3],
+    levelConfig.bulletCount,
+    params.damageMultiplier,
+    params.explodeRangeMultiplier,
+    levelConfig.maxActivationStacks
+  )
 end
 
 -- 技能1激活测试（取势）：确认选择后（框架传入 targetPos）检查引爆范围内是否有已部署黑子，

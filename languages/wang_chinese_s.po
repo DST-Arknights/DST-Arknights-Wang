@@ -210,6 +210,11 @@ msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL2_NOT_ENOUGH_PIECES"
 msgid "Not enough black stones to complete the ring"
 msgstr "棋子不足，无法成围……"
 
+#. STRINGS.CHARACTERS.WANG.WANG_SKILL3_CANT_RIDE
+msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_CANT_RIDE"
+msgid "How can I enter the board while mounted...?"
+msgstr "骑乘之时，如何入局……"
+
 #. STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL3_NEED_SWORD"
 msgid "Without the sword, how can I make a move...?"

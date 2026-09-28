@@ -962,9 +962,27 @@ local function OnWangSkill3Install(skill)
   skill:ListenForEventWhileActivating("wang_skill3_manual_deploy", OnWangSkill3ManualDeploy)
 end
 
-local function OnWangSkill3ActivateTest(skill, params)
-  if not HasNianziSword(skill.inst) then
+local function CanStartWangSkill3(skill)
+  local inst = skill.inst
+  if inst.components.rider ~= nil and inst.components.rider:IsRiding() then
+    return false, 'WANG_SKILL3_CANT_RIDE'
+  end
+  if not HasNianziSword(inst) then
     return false, 'WANG_SKILL3_NEED_SWORD'
+  end
+  return true
+end
+
+-- 地图选择器打开前先检查施法姿态，避免骑乘/未持剑时仍弹出地图。
+local function OnWangSkill3ActivateSelectorTest(skill)
+  return CanStartWangSkill3(skill)
+end
+
+local function OnWangSkill3ActivateTest(skill, params)
+  -- 确认目标时再校验一次，防止选择期间装备或骑乘状态发生变化。
+  local can, reason = CanStartWangSkill3(skill)
+  if not can then
+    return false, reason
   end
   -- 地图选择器已在主客两端把点击吸附到聚合代理中心；这里只需要聚合坐标，不依赖具体棋子实体。
   return params ~= nil and params.targetPos ~= nil
@@ -1120,6 +1138,7 @@ local skillConfig = {
     energyRecoveryMode = ARK_CONSTANTS.ENERGY_RECOVERY_MODE.AUTO,
     activationMode = ARK_CONSTANTS.ACTIVATION_MODE.MANUAL,
     targetSelector = "wang_skill3_map",
+    ActivateSelectorTest = OnWangSkill3ActivateSelectorTest,
     ActivateTest = OnWangSkill3ActivateTest,
     OnActivate = OnWangSkill3Activate,
     levels = { {

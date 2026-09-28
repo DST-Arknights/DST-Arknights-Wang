@@ -24,6 +24,7 @@ PrefabFiles = {'wang', 'wang_none', 'piece', 'nianzi_sword', 'piece_link_field',
 Assets = {
   Asset("SOUNDPACKAGE", "sound/wang.fev"),
   Asset("SOUND", "sound/wang.fsb"),
+  Asset("ATLAS", "images/recipe_mastery_bg.xml"),
 }
 
 AddMinimapAtlas('images/map_icons/wang.xml')
@@ -174,6 +175,7 @@ AddPlayerPostInit(function(inst)
   end
 end)
 modimport("modmain/recipe_mastery")
+modimport("modmain/recipe_mastery_bg")
 
 -- ════════════════════════════════════════════════════════
 -- 棋盒主人组件（宠物式存在）：棋盒 follow 态存档数据由主人管理

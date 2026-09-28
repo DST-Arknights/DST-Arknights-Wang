@@ -1,7 +1,7 @@
 -- recipe_mastery 副本（客户端）
 -- 每个"可掌握的有效配方"一个 net_tinybyte（3-bit [0..7]）状态，挂在玩家实体上（全客户端可见）
 -- 状态约定（RECIPE_MASTERY_STATE，定义于 modmain）：
---   0 = 未知/未掌握   1 = 已掌握   2 = 尝试过但未掌握   3~7 = 保留
+--   0 = 未掌握   1 = 掌握中   2 = 已掌握   3~7 = 保留
 
 local RecipeMasteryReplica = Class(function(self, inst)
   self.inst = inst

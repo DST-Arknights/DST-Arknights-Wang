@@ -1,0 +1,155 @@
+Quiet and taciturn, Wang prefers to observe, assess, and only then place a stone.
+
+He plays with Black Stones and wagers his life on the board. As he grows, his body becomes more fragile while the board he can command grows larger. [b]Mastering recipes, gathering Black Stones, preparing the battlefield, and turning the tide with his skills[/b] is his core playstyle.
+
+[h2]Requirements and Settings[/h2]
+
+Requires the [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770]Arknights Item Package[/url] prerequisite mod.
+
+The mod supports Simplified Chinese and English text. Voice-over can be set to Mandarin Chinese, Japanese, or Hunanese in the mod settings.
+
+[h2]Base Stats and Traits[/h2]
+
+[list]
+[*][b]Health: 181 → 1[/b]; his maximum health decreases as he levels up.
+[*][b]Sanity: 361.[/b]
+[*][b]Hunger: 150.[/b]
+[*]Movement speed, weapon damage, and work efficiency are all [b]80%[/b] of a standard character's.
+[*]Hunger drains more slowly, but food restores only [b]50%[/b] of the usual hunger.
+[*]Immune to knockback and the Monkey Curse; can read books.
+[*]Cannot carry heavy objects alone, but can while riding a beefalo.
+[/list]
+
+[h2]Progression and Learning[/h2]
+
+[h3]Levels and Elite Promotions[/h3]
+
+Wang gains experience by [b]mastering new recipes and using skills[/b], rather than by killing creatures.
+
+[list]
+[*]Elite 0: level cap of 50.
+[*]Elite I: level cap of 80.
+[*]Elite II: level cap of 90.
+[/list]
+
+Once he reaches the current level cap, Wang can spend materials at the Training Room to promote. Elite promotions unlock new skills and talents.
+
+[h3]Recipe Mastery[/h3]
+
+When he crafts an item with a recipe he can learn, Wang has a chance to master it.
+
+[list]
+[*][b]Mastering:[/b] Each recipe he has yet to master continuously drains sanity.
+[*][b]Mastered:[/b] Each mastered recipe continuously restores sanity.
+[/list]
+
+The crafting menu uses different backgrounds to show these two states.
+
+Whenever Wang levels up, he automatically tries to master a new recipe, prioritizing recipes he is already working on. Elite promotions increase his chance to master a recipe while crafting.
+
+Wearing a [b]Construction Amulet[/b] adds 50 percentage points to his recipe mastery chance and biases level-up learning toward higher-difficulty recipes.
+
+[h3]Reading Books[/h3]
+
+The first time Wang reads a given book, it costs more sanity. The cost gradually decreases with repeated readings.
+
+[h2]Cloud Beast and Nianzi Sword[/h2]
+
+[h3]Cloud Beast[/h3]
+
+Wang starts with the [b]Cloud Beast[/b], a beast-shaped chess box that follows him.
+
+[list]
+[*]Has [b]4 storage slots[/b]; items inside can stack beyond normal stack-size limits.
+[*]Can be equipped on the head, providing [b]120 insulation and 80% wetness resistance[/b].
+[*]Restores a small amount of sanity while following Wang.
+[/list]
+
+[h3]Nianzi Sword[/h3]
+
+Recipe: [b]10 Gold Nuggets, 10 Living Logs, and 10 Nightmare Fuel[/b].
+
+The Nianzi Sword has no durability and deals area damage with melee attacks. With it equipped, [b]right-click the ground[/b] to spend a carried Black Stone and place it.
+
+You can also equip a [b]Black Stone[/b] in your hand and right-click to throw it to a chosen spot. It deals a small amount of area damage on landing and deploys there.
+
+[h2]Black Stones and Board Setup[/h2]
+
+Black Stones are placed on a grid, with [b]one stone per tile[/b].
+
+The number of stones Wang can deploy increases as he grows. If he places more after reaching the limit, his oldest deployed stone disappears. Deployed stones can be reclaimed with a [b]hammer or the Nianzi Sword[/b].
+
+A regular Black Stone becomes a trap when deployed. It detonates when a hostile creature or animal approaches. Players do not trigger proximity detonation, but can still be caught in the blast.
+
+Black Stone damage increases with the deployer's level. Orthogonally adjacent stones also boost one another's damage. This bonus lingers briefly after a neighboring stone disappears, helping with chain detonations.
+
+[h2]Talents[/h2]
+
+[h3]Cast Stone[/h3]
+
+Periodically generates Black Stones, with generation speed increasing at higher Elite levels.
+
+Generated stones are added to the Cloud Beast first.
+
+[h3]Answer Calamity[/h3]
+
+[b]Unlocked at Elite I.[/b] Each of Wang's deployed Black Stones grants damage reduction; the more stones he has on the board, the less damage he takes.
+
+At Elite II, a Black Stone can block a fatal hit and grant brief protection. Deployed stones are consumed first; if there are none on the board, carried stones are consumed instead.
+
+[h2]Skills[/h2]
+
+All skills [b]recharge automatically and are activated manually[/b].
+
+[h3]Seize Advantage[/h3]
+
+[b]Unlocked from the start.[/b]
+
+Choose an area to [b]instantly detonate the Black Stones already deployed within it[/b].
+
+Elite promotions increase detonation damage and the number of charges that can be stored.
+
+The detonation also applies [b]chopping, mining, digging, and hammering effects[/b] within the area.
+
+[h3]Linked Stars[/h3]
+
+[b]Unlocked at Elite I.[/b]
+
+Choose a grid area. The skill [b]places stones at its four corners and links them into a closed ring[/b].
+
+Existing stones near the corners are reused when possible, so Wang only spends carried stones to fill the gaps. Any new stones drop into place in sequence before forming an electric fence.
+
+Linked stones no longer detonate when creatures approach. Creatures that touch the links take [b]electric damage and brief crowd control[/b]. Players are hurt if they touch the links, too.
+
+[h3]World Endgame[/h3]
+
+[b]Unlocked at Elite II.[/b] Requires the Nianzi Sword to be equipped; cannot be used while riding.
+
+Choose a target from the [b]board markers on the map[/b]. Wang surveys the whole board and can still place stones with the Nianzi Sword.
+
+[list]
+[*]Activation supplies Black Stones and extra placement ammunition.
+[*]Each right-click still spends one carried Black Stone and also adds stones to vacant adjacent tiles. The number added is limited by open tiles and ammunition.
+[*]Stones placed with the Nianzi Sword and the extra stones deal more damage, have a larger blast radius, and extend the neighboring-stone bonus over a wider area.
+[/list]
+
+[b]Activate the skill again to end it early.[/b] Wang returns to where he started. The skill also ends when its extra ammunition or his carried Black Stones run out, or when he unequips the Nianzi Sword. Any remaining ammunition is returned as regular Black Stones.
+
+Board markers on the map are formed by deployed Black Stones.
+
+[h2]Sharing Recipes with Teammates[/h2]
+
+At Elite II, as long as Wang has [b]no recipes currently being mastered[/b], he can right-click a nearby player to exchange recipes.
+
+[list]
+[*][b]Teach:[/b] If Wang knows a recipe the other player has not mastered, he teaches it to them.
+[*][b]Ask:[/b] If the other player knows every recipe Wang has mastered and has additional recipes Wang has not, Wang learns from them.
+[/list]
+
+Both players sit down to talk for a while and spend some sanity. When the exchange is complete, the student randomly masters a learnable recipe that the teacher knows and the student does not.
+
+Wang cannot leave voluntarily as the initiator, but the other player can interrupt the exchange.
+
+[quote]
+He is simply used to placing a stone before things happen.
+[/quote]

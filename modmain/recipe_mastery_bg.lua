@@ -31,6 +31,7 @@ AddClassPostConstruct("widgets/redux/craftingmenu_widget", function(self)
 
     local width, height = widget.bg:GetSize()
     overlay:SetSize(width, height)
+    overlay:MoveToBack()
     overlay:Show()
   end)
 

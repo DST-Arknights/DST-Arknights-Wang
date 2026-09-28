@@ -148,30 +148,49 @@ local function TryConsumeYingjieResource(talent, params)
   return carriedCost > 0 and PieceResource.TryConsume(talent.inst, carriedCost)
 end
 
-local function IsYingjieLethal(health, amount, ignore_invincible, afflicter, ignore_absorb)
-  if amount >= 0 or ignore_absorb or health.currenthealth <= 0 or (health.minhealth or 0) > 0 then
+local function IsM3CocoonArmorMinHealth(health)
+  local inventory = health.inst.components.inventory
+  local modifiers = health.minhealthmodifiers
+  if inventory == nil or modifiers == nil then
     return false
+  end
+
+  -- 遍历实际装备槽，兼容额外装备栏；其他来源更高的锁血下限仍保留优先级。
+  for _, armor in pairs(inventory.equipslots) do
+    if armor.prefab == "armor_construct" then
+      local armorMinHealth = modifiers:CalculateModifierFromSource(armor)
+      if armorMinHealth > 0 and health.minhealth == armorMinHealth then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function IsYingjieLethal(health, amount, ignore_invincible, ignore_absorb)
+  if amount >= 0 or ignore_absorb or health.currenthealth <= 0 then
+    return false
+  end
+  local lethalHealth = 0
+  if (health.minhealth or 0) > 0 then
+    if not IsM3CocoonArmorMinHealth(health) then
+      return false
+    end
+    -- 茧甲在触及最低生命值时就会牺牲，应劫必须先于这个下限判断，而非等到 0 血。
+    lethalHealth = math.min(health.minhealth, health:GetMaxWithPenalty())
   end
   if not ignore_invincible and (health:IsInvincible() or health.inst.is_teleporting) then
     return false
   end
 
   local projected = amount
-  local absorb = health.playerabsorb ~= 0
-      and afflicter ~= nil
-      and afflicter:HasTag("player")
-      and health.playerabsorb + health.absorb
-      or health.absorb
-  projected = projected
-      * math.clamp(1 - absorb, 0, 1)
-      * math.max(1 - health.externalabsorbmodifiers:Get(), 0)
-
+  -- deltamodifierfn 已拿到实际减伤结果，之后只剩原版的单次伤害上限。
   if health.maxdamagetakenperhit ~= nil
       and projected < health.maxdamagetakenperhit
       and not health._ignore_maxdamagetakenperhit then
     projected = health.maxdamagetakenperhit
   end
-  return health.currenthealth + projected <= 0
+  return projected < 0 and health.currenthealth + projected <= lethalHealth
 end
 
 local function OnYingjieInstall(talent)
@@ -181,7 +200,7 @@ local function OnYingjieInstall(talent)
     return
   end
 
-  -- externalabsorbmodifiers 会在 health.redirect 之后结算，因此致命判断前先按当前落子数刷新减伤。
+  -- 先按当前落子数刷新减伤；已有保护在生命结算前直接挡掉。
   talent:HookFunctionWhileUnlocked(health, "redirect", function(next, player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
     if next(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb) then
       return true
@@ -196,16 +215,21 @@ local function OnYingjieInstall(talent)
       PlayYingjieShieldHit(talent)
       return true
     end
+    return false
+  end)
 
+  -- 首次保护使用护甲和生命减伤结算后的实际伤害，先于 minhealth 的装备复活。
+  talent:HookFunctionWhileUnlocked(health, "deltamodifierfn", function(next, player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
+    amount = next(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
     local params = talent:GetLevelParams()
     if not params.lethalProtection
-        or not IsYingjieLethal(health, amount, ignore_invincible, afflicter, ignore_absorb)
+        or not IsYingjieLethal(health, amount, ignore_invincible, ignore_absorb)
         or not TryConsumeYingjieResource(talent, params) then
-      return false
+      return amount
     end
 
     StartYingjieGuard(talent, params.guardDuration or 0)
-    return true
+    return 0
   end)
 
   -- 保护窗口内的普通战斗攻击在护甲结算前直接挡掉；解锁/锁定/读档生命周期交给框架。

@@ -81,9 +81,11 @@ local function SpawnHitEnemyFx(ent)
   SpawnFxAt("fx_dock_pop", x, y, z)
 end
 
--- 主动爆炸额外摧毁周围建造物（参考凯尔希二技能子弹命中：collapse_small + workable:Destroy）
--- 不含已部署棋子，避免连锁引爆
+-- 主动爆炸对周围可作业物施加固定工作量，不含已部署棋子，避免连锁引爆。
+-- 等价于多用镐斧连续作业 5 次；走 WorkedBy_Internal 保留 workmultiplier / worked / onwork 等标准流程，
+-- 但不受施法者当前手持工具的 tough-work / recoil 门槛影响（爆炸本身就是工作来源）。
 local DESTROY_TAGS = { "CHOP_workable", "MINE_workable", "HAMMER_workable", "DIG_workable" }
+local EXPLOSION_WORK_AMOUNT = 5 * TUNING.MULTITOOL_AXE_PICKAXE_EFFICIENCY
 local function DestroySurroundingBuildings(inst, source, range)
   local x, y, z = inst.Transform:GetWorldPosition()
   local ents = TheSim:FindEntities(x, y, z, range, nil,
@@ -91,9 +93,7 @@ local function DestroySurroundingBuildings(inst, source, range)
   for _, ent in ipairs(ents) do
     if ent.components.workable ~= nil and ent.components.workable:CanBeWorked() then
       SpawnPrefab("collapse_small").Transform:SetPosition(ent.Transform:GetWorldPosition())
-      repeat
-        ent.components.workable:Destroy(source)
-      until not (ent:IsValid() and ent.components.workable ~= nil and ent.components.workable:CanBeWorked())
+      ent.components.workable:WorkedBy_Internal(source or inst, EXPLOSION_WORK_AMOUNT)
     end
   end
 end

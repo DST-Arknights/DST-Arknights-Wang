@@ -31,6 +31,10 @@ AddClassPostConstruct("widgets/redux/craftingmenu_widget", function(self)
 
     local width, height = widget.bg:GetSize()
     overlay:SetSize(width, height)
+    -- 背景之上、配方图标及原版前景标记之下。
+    overlay:MoveToFront()
+    widget.item_img:MoveToFront()
+    widget.fg:MoveToFront()
     overlay:Show()
   end)
 

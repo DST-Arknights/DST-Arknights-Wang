@@ -10,13 +10,13 @@ name = T({
 })
 -- 版本更新说明（由发布脚本自动维护，请勿手动编辑）
 local UPDATE_EN = [[
-v0.1.0 (2026-08-17)
-- 项目初始化
+v1.0.1 (2026-10-01)
+- Added keepdeadleader option to follower component.
 ]]
 
 local UPDATE_ZH = [[
-v0.1.0 (2026-08-17)
-- 项目初始化
+v1.0.1 (2026-10-01)
+- follower component 新增 keepdeadleader 选项。
 ]]
 
 description = T({
@@ -41,7 +41,7 @@ QQ群: 666511586
 欢迎大家积极参与!]]
 })
 author = "让 望月心灵"
-version = "1.0.0"
+version = "1.0.1"
 forumthread = "https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770"
 
 api_version = 10

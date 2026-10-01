@@ -328,6 +328,7 @@ local function fn()
 
   inst:AddComponent("follower")
   inst.components.follower.neverexpire = true
+  inst.components.follower.keepdeadleader = true
   inst.components.follower.keepleaderduringminigame = true
   inst:ListenForEvent("startfollowing", OnStartFollowing)
   inst:ListenForEvent("stopfollowing", OnStopFollowing)

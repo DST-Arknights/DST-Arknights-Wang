@@ -252,7 +252,7 @@ local function master_post_init(inst)
   -- 生命上限随成长降低：基础 181，成长满后为 1（框架按累计等级平滑施加负奖励）
   inst.components.ark_elite:SetMaxHealthBonus(TUNING.WANG.MAX_HEALTH_BONUS)
   -- 关闭击杀经验，改为自定义来源（解锁配方 / 使用技能）
-  inst.components.ark_elite:SetKillExpEnabled(false)
+  inst.components.ark_elite:SetKillExpFn(nil)
 
   -- 技能（绑定精英化解锁）
   inst:AddComponent("ark_skill")

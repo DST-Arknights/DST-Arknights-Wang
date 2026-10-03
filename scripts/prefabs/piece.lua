@@ -60,6 +60,18 @@ local prefabs = {
   "cavehole_flick",
 }
 
+local function GetPieceCreditTarget(source, victim)
+  local userid = source._deployerUserid
+  if userid ~= nil then
+    for _, player in pairs(AllPlayers) do
+      if player:IsValid() and player.userid == userid then
+        return player
+      end
+    end
+  end
+  return nil
+end
+
 -- ────────────────────────────────────────────────────────
 -- 爆炸相关（参考游戏源码 explosive 组件 + 凯尔希二技能子弹）
 -- ────────────────────────────────────────────────────────
@@ -99,7 +111,7 @@ local function DestroySurroundingBuildings(inst, source, range)
 end
 
 -- 范围伤害（参考火药爆炸 explosive 组件：范围内所有可攻击目标）
---   source  伤害来源（主动=施法者记击杀；被动=棋子自身不记名）
+--   source  伤害来源（主动=施法者；被动=棋子自身，击杀归属通过转移组件解析）
 --   suggest 被动时吸引仇恨的对象（摧毁者）
 local function AoEExplode(inst, source, damage, range, active, suggest)
   if active then
@@ -149,7 +161,7 @@ local function PassiveDetonateCheck(inst)
       and dude.components.combat ~= nil and dude.components.combat:CanBeAttacked(inst)
   end, PROX_MUST_TAGS, PROX_NO_TAGS, PROX_ONEOF_TAGS)
   if target ~= nil then
-    inst:PassiveExplode(nil, 1) -- 被动引爆：范围伤害、不摧毁建造物、不记击杀
+    inst:PassiveExplode(nil, 1) -- 被动引爆：范围伤害、不摧毁建造物，保留棋子伤害来源
   end
 end
 
@@ -594,6 +606,9 @@ local function fn()
   inst:ListenForEvent("onremove", OnRemove)
 
   inst:AddComponent("inspectable")
+
+  inst:AddComponent("ark_kill_transfer")
+  inst.components.ark_kill_transfer:SetCreditTargetFn(GetPieceCreditTarget)
 
   inst:AddComponent("inventoryitem")
 

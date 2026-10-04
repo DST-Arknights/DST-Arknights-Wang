@@ -109,7 +109,7 @@ TUNING.WANG.SKILL3_MAP_CLUSTER_SIZE = 20
 
 -- 经验来源（已关闭框架默认击杀经验）
 TUNING.WANG.EXP_PER_RECIPE_UNLOCK = 10 -- 解锁配方
-TUNING.WANG.EXP_PER_SKILL_USE = 10     -- 使用技能
+TUNING.WANG.EXP_PER_SKILL_USE = 50     -- 使用技能
 
 -- 读书理智消耗控制（倍率：首次阅读新书翻倍 → 随已读次数降至 0.5 倍）
 TUNING.WANG.READ_SANITY_MULT_FIRST = 2   -- 首次阅读理智消耗倍率

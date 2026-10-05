@@ -8,6 +8,8 @@ name = T({
     en = "Wang",
     zh = "望"
 })
+version = "1.0.3"
+
 -- 版本更新说明（由发布脚本自动维护，请勿手动编辑）
 local UPDATE_EN = [[
 v1.0.3 (2026-10-05)
@@ -30,7 +32,7 @@ v1.0.2 (2026-10-05)
 description = T({
     en = [[A DST character mod: Wang, the quiet chess player who builds his board one black stone at a time.
 
-]] .. UPDATE_EN .. [[
+Current version: ]] .. version .. "\n" .. UPDATE_EN .. [[
 
 Issues & Suggestions Feedback Channels:
 Issues: https://github.com/DST-Arknights/DST-Arknights-Wang/issues
@@ -39,7 +41,7 @@ QQ Group: 666511586
 ]],
     zh = [[饥荒联机版的明日方舟角色模组：望，沉默的弈者，以黑子为棋，以性命为盘。
 
-]] .. UPDATE_ZH .. [[
+当前版本: ]] .. version .. "\n" .. UPDATE_ZH .. [[
 
 需求与建议反馈渠道:
 Issues: https://github.com/DST-Arknights/DST-Arknights-Wang/issues
@@ -49,7 +51,6 @@ QQ群: 666511586
 欢迎大家积极参与!]]
 })
 author = "让 望月心灵"
-version = "1.0.3"
 forumthread = "https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770"
 
 api_version = 10

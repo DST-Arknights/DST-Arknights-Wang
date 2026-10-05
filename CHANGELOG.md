@@ -1,5 +1,13 @@
 # 版本更新记录
 
+## v1.1.0 (2026-10-06)
+
+- 非 PvP 模式下，棋子爆炸与连星闪电不再伤害玩家，触电动作和 PvP 中的伤害行为保持不变。
+- 更新版本号，并在描述中显示当前版本信息。
+---
+- In non-PvP mode, Chess Piece explosions and Linked Star Lightning no longer damage players; the shock animation and PvP damage behavior remain unchanged.
+- Updated the version number and added the current version info to the description.
+
 ## v1.0.3 (2026-10-05)
 
 - 修复精英化一解锁 Yingjie 后生命结算报错的问题；受伤、治疗和 HUD 生命值刷新恢复正常，解锁、锁定、移除及读档后也保持正常。

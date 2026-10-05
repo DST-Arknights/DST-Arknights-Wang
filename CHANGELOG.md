@@ -1,5 +1,11 @@
 # 版本更新记录
 
+## v1.0.3 (2026-10-05)
+
+- 修复精英化一解锁 Yingjie 后生命结算报错的问题；受伤、治疗和 HUD 生命值刷新恢复正常，解锁、锁定、移除及读档后也保持正常。
+---
+- Fixed a health calculation error after unlocking Yingjie at Elite 1; taking damage, healing, and HUD health refresh now work correctly, including after unlocking, locking, removing, and loading saves.
+
 ## v1.0.2 (2026-10-05)
 
 - 调整技能使用经验值和击杀经验的来源。

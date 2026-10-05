@@ -193,11 +193,20 @@ local function IsYingjieLethal(health, amount, ignore_invincible, ignore_absorb)
   return projected < 0 and health.currenthealth + projected <= lethalHealth
 end
 
+local function KeepHealthDelta(_, amount)
+  return amount
+end
+
 local function OnYingjieInstall(talent)
   local inst = talent.inst
   local health = inst.components.health
   if health == nil then
     return
+  end
+
+  -- 数值回调必须先补齐链尾，解锁 Hook 及锁定后的空链才能原样返回生命变化量。
+  if health.deltamodifierfn == nil then
+    health.deltamodifierfn = KeepHealthDelta
   end
 
   -- 先按当前落子数刷新减伤；已有保护在生命结算前直接挡掉。

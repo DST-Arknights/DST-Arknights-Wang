@@ -126,7 +126,8 @@ local function DoCollideShock(other, inst)
     -- 电网本身作为环境伤害，不制造仇恨目标；伤害与本次触电共用冷却。
     if other.components.health ~= nil
         and not other.components.health:IsDead()
-        and other.components.combat ~= nil then
+        and other.components.combat ~= nil
+        and (not other:HasTag("player") or not TUNING.WANG.PIECE_PVE_NO_PLAYER_DAMAGE or TheNet:GetPVPEnabled()) then
       other.components.combat:GetAttacked(nil, GetShockDamage(other), nil, "electric")
     end
 

@@ -110,7 +110,7 @@ local function DestroySurroundingBuildings(inst, source, range)
   end
 end
 
--- 范围伤害（参考火药爆炸 explosive 组件：范围内所有可攻击目标）
+-- 范围伤害（参考火药爆炸 explosive 组件；非 PvP 时按开关排除玩家）
 --   source  伤害来源（主动=施法者；被动=棋子自身，击杀归属通过转移组件解析）
 --   suggest 被动时吸引仇恨的对象（摧毁者）
 local function AoEExplode(inst, source, damage, range, active, suggest)
@@ -122,6 +122,7 @@ local function AoEExplode(inst, source, damage, range, active, suggest)
   local ents = TheSim:FindEntities(x, y, z, range, nil, { "INLIMBO", "notarget" })
   for _, ent in ipairs(ents) do
     if ent ~= inst and not ent:IsInLimbo() and ent:IsValid()
+        and (not ent:HasTag("player") or not TUNING.WANG.PIECE_PVE_NO_PLAYER_DAMAGE or TheNet:GetPVPEnabled())
         and not (ent.components.health ~= nil and ent.components.health:IsDead())
         and ent.components.combat ~= nil and ent.components.combat:CanBeAttacked() then
       ent.components.combat:GetAttacked(source, damage)
@@ -153,7 +154,7 @@ end
 -- ────────────────────────────────────────────────────────
 -- 部署态被动引爆：周期检测引爆半径内目标，命中即直接爆炸（陷阱）
 -- 参考蜜蜂地雷 mine 组件（DoPeriodicTask + FindEntity）
--- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸本身对所有可攻击目标造成伤害，不摧毁建造物
+-- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸伤害由 AoEExplode 统一筛选，不摧毁建造物
 -- ────────────────────────────────────────────────────────
 local function PassiveDetonateCheck(inst)
   local target = FindEntity(inst, EXPLODE_RANGE * inst._explodeRangeMultiplier, function(dude)

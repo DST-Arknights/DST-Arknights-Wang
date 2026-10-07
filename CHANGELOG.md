@@ -1,5 +1,11 @@
 # 版本更新记录
 
+## v1.1.1 (2026-10-07)
+
+- 新增 Cloud Beast 制作配方。
+---
+- Added a crafting recipe for Cloud Beast.
+
 ## v1.1.0 (2026-10-06)
 
 - 非 PvP 模式下，棋子爆炸与连星闪电不再伤害玩家，触电动作和 PvP 中的伤害行为保持不变。

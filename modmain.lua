@@ -51,6 +51,24 @@ AddCharacterRecipe("nianzi_sword", {
   "MODS",
 })
 
+local function CanBuildPieceBox(_, builder)
+  local owner = builder.components.wang_chess_box_owner
+  return owner == nil or owner:GetBox() == nil, "HAS_PIECE_BOX"
+end
+
+-- 云兽重制配方（望专属）：仅加入角色制作栏，已有绑定云兽时禁止重复制作
+AddCharacterRecipe("piece_box", {
+  Ingredient("boards", 6),
+  Ingredient("livinglog", 6),
+  Ingredient("piece", 20, "images/inventoryimages/piece.xml"),
+}, TECH.NONE, {
+  builder_tag = "wang",
+  atlas = "images/inventoryimages/piece_box.xml",
+  image = "piece_box.tex",
+  description = "PIECE_BOX",
+  canbuild = CanBuildPieceBox,
+})
+
 -- ════════════════════════════════════════════════════════
 -- 常量配置
 -- ════════════════════════════════════════════════════════

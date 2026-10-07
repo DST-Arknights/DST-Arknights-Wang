@@ -110,6 +110,11 @@ msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
 msgid "A pawn advances daily; no effort is ever wasted."
 msgstr "A pawn advances daily; no effort is ever wasted."
 
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.HAS_PIECE_BOX
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.HAS_PIECE_BOX"
+msgid "One Cloud Beast is enough."
+msgstr "One Cloud Beast is enough."
+
 #. STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED
 msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED"
 msgid "Learned %s"
@@ -239,6 +244,11 @@ msgstr "Luozi"
 msgctxt "STRINGS.RECIPE_DESC.NIANZI_SWORD"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "He is simply used to placing a stone before things happen."
+
+#. STRINGS.RECIPE_DESC.PIECE_BOX
+msgctxt "STRINGS.RECIPE_DESC.PIECE_BOX"
+msgid "The board lies ahead, the chess box at my side."
+msgstr "The board lies ahead, the chess box at my side."
 
 #. Wang skill 1 active voice line
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_CAST"

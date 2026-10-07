@@ -110,6 +110,11 @@ msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.WANG_MASTER_FAIL"
 msgid "A pawn advances daily; no effort is ever wasted."
 msgstr "日拱一卒，功不唐捐。"
 
+#. STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.HAS_PIECE_BOX
+msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.BUILD.HAS_PIECE_BOX"
+msgid "One Cloud Beast is enough."
+msgstr "已有云兽相伴，足矣。"
+
 #. STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED
 msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_LEARNED"
 msgid "Learned %s"
@@ -239,6 +244,11 @@ msgstr "落子"
 msgctxt "STRINGS.RECIPE_DESC.NIANZI_SWORD"
 msgid "He is simply used to placing a stone before things happen."
 msgstr "他只是习惯在事情发生之前，先落下一子。"
+
+#. STRINGS.RECIPE_DESC.PIECE_BOX
+msgctxt "STRINGS.RECIPE_DESC.PIECE_BOX"
+msgid "The board lies ahead, the chess box at my side."
+msgstr "棋盘在前，棋盒在旁。"
 
 #. 望技能1主动语音文案
 msgctxt "STRINGS.CHARACTERS.WANG.WANG_SKILL1_CAST"

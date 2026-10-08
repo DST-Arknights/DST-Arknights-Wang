@@ -133,5 +133,5 @@ configuration_options = { {
     default = "auto"
 }}
 mod_dependencies = {
-    {["DST-ArknightsItemPackage"] = false},
+    {["DST-Arknights-Nexus"] = false},
 }

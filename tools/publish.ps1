@@ -1,4 +1,4 @@
-# 项目发布入口；公共流程和配置契约由 DST-ArknightsItemPackage 统一实现。
+# 项目发布入口；公共流程和配置契约由 DST-Arknights-Nexus 统一实现。
 #
 # 用法:
 #   pwsh ./tools/publish.ps1 -Bump patch
@@ -26,13 +26,13 @@ $projectConfig = @{
         'docs/workshop_description_en-steam.txt'
     )
     WorkshopDeps = @{
-        'DST-ArknightsItemPackage' = 'workshop-3677284770'
+        'DST-Arknights-Nexus' = 'workshop-3677284770'
     }
 }
 
-$sharedEntry = Join-Path $PSScriptRoot '..\..\DST-ArknightsItemPackage\tools\publish.ps1'
+$sharedEntry = Join-Path $PSScriptRoot '..\..\DST-Arknights-Nexus\tools\publish.ps1'
 if (-not (Test-Path -LiteralPath $sharedEntry)) {
-    Write-Error "未找到物品包统一发布入口（相对路径）: $sharedEntry"
+    Write-Error "未找到源枢统一发布入口（相对路径）: $sharedEntry"
     exit 1
 }
 $sharedEntry = (Resolve-Path -LiteralPath $sharedEntry).Path

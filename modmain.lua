@@ -6,7 +6,7 @@ GLOBAL.setmetatable(env, {
     return GLOBAL.rawget(GLOBAL, k)
   end
 })
-assert(ARK_ITEM_PACKAGE_LOADED, "请安装前置模组: ark_item_package\n please install the required mod: ark_item_package\n[https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770]")
+assert(ARK_ITEM_PACKAGE_LOADED, "请安装前置模组：源枢 (Arknights: Nexus)\n please install the prerequisite mod: Arknights: Nexus\n[https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770]")
 
 -- ════════════════════════════════════════════════════════
 -- 语言（台词直接写入 PO，随语言翻译）

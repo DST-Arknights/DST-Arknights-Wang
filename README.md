@@ -6,7 +6,7 @@
 
 ## 依赖
 
-- [DST-ArknightsItemPackage（明日方舟 物品包）](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770) — 必需前置，提供精英化 / 技能 / 材料 / Buff 等共享框架。
+- [源枢（Arknights: Nexus）](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770) — 必需前置，提供精英化 / 技能 / 材料 / Buff 等共享框架。
 
 ## 目录结构
 

@@ -4,7 +4,7 @@ He plays with Black Stones and wagers his life on the board. As he grows, his bo
 
 ## Requirements and Settings
 
-Requires the [Arknights Item Package](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770) prerequisite mod.
+Requires the [Arknights: Nexus](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770) prerequisite mod.
 
 The mod supports Simplified Chinese and English text. Voice-over can be set to Mandarin Chinese, Japanese, or Hunanese in the mod settings.
 

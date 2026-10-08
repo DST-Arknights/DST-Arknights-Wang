@@ -4,7 +4,7 @@
 
 ## 前置与配置
 
-需要同时启用前置模组：[明日方舟 物品包](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770)。
+需要同时启用前置模组：[源枢](https://steamcommunity.com/sharedfiles/filedetails/?id=3677284770)。
 
 模组支持简体中文与英文界面，并可在配置中选择普通话、日语或湖南话配音。
 

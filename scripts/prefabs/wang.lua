@@ -57,24 +57,6 @@ local function WangWorkMultiplierFn(inst, action, target, tool, numworks, recoil
 end
 
 -- ════════════════════════════════════════════════════════
--- 特性：无法独自搬运（平时禁重物，骑牛可搬）
--- ════════════════════════════════════════════════════════
-local function OnMounted(inst)
-  inst.components.inventory.noheavylifting = false
-end
-
-local function OnDismounted(inst)
-  inst.components.inventory.noheavylifting = true
-  -- 下牛时若仍扛着重物则放下（不能独自搬运）
-  if inst.components.inventory:IsHeavyLifting() then
-    local item = inst.components.inventory:GetEquippedItem(EQUIPSLOTS.BODY)
-    if item ~= nil then
-      inst.components.inventory:DropItem(item, true, true)
-    end
-  end
-end
-
--- ════════════════════════════════════════════════════════
 -- 经验来源
 -- ════════════════════════════════════════════════════════
 -- 使用技能（解锁/掌握经验由 recipe_mastered 事件发放）
@@ -314,10 +296,8 @@ local function master_post_init(inst)
     return false
   end
 
-  -- 特性：无法独自搬运（平时禁止重物，骑牛时放开）
-  inst.components.inventory.noheavylifting = true
-  inst:ListenForEvent("mounted", OnMounted)
-  inst:ListenForEvent("dismounted", OnDismounted)
+  -- 特性：隐藏搬运体力（步行消耗，歇息恢复，骑牛不消耗）。
+  inst:AddComponent("wang_carry_stamina")
 end
 
 return MakePlayerCharacter("wang", prefabs, assets, common_post_init, master_post_init)

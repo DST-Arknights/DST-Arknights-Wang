@@ -123,12 +123,17 @@ msgstr "学到了 %s"
 #. STRINGS.CHARACTER_DESCRIPTIONS.wang
 msgctxt "STRINGS.CHARACTER_DESCRIPTIONS.wang"
 msgid "A quiet chess player, trading his life for the board"
-msgstr "*沉默寡言的弈者，以黑子为棋，以性命为盘\n*生命随成长逐渐降低，黑子能力随之增强\n*无法独自搬运重物，骑乘驯牛方可\n*擅长阅读书籍，配方需逐一掌握"
+msgstr "*沉默寡言的弈者，以黑子为棋，以性命为盘\n*生命随成长逐渐降低，黑子能力随之增强\n*可短时搬运重物，歇息恢复体力；骑牛不受限制\n*擅长阅读书籍，配方需逐一掌握"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING"
-msgid "Too heavy to carry alone..."
-msgstr "此物非一人能负……"
+msgid "Let me catch my breath first..."
+msgstr "容我缓口气……"
+
+#. STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_CARRY_EXHAUSTED
+msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_CARRY_EXHAUSTED"
+msgid "A moment's rest... then I'll carry on."
+msgstr "且歇片刻……再行搬运。"
 
 #. STRINGS.ACTIONS.TEACH_RECIPE
 msgctxt "STRINGS.ACTIONS.TEACH_RECIPE"

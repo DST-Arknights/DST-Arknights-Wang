@@ -105,6 +105,11 @@ TUNING.WANG.WORK_EFFICIENCY = 0.8      -- 工作效率
 TUNING.WANG.HUNGER_DRAIN_RATE = 0.8    -- 饥饿下降速率（较慢）
 TUNING.WANG.EAT_EFFECT_MULTIPLIER = 0.5 -- 进食饥饿恢复（0.5倍）
 
+-- 隐藏搬运体力（单位：秒；放下或骑牛时恢复，耗尽后需强制歇息）。
+TUNING.WANG.CARRY_DURATION = 60
+TUNING.WANG.CARRY_RECOVERY_TIME = 60
+TUNING.WANG.CARRY_EXHAUSTED_REST = 10
+
 -- 黑子（可调整数值；物理数值在 piece.lua 内）
 TUNING.WANG.PIECE_THROW_DAMAGE = 5    -- 落地对附近生物伤害
 TUNING.WANG.PIECE_BASE_DAMAGE = 10    -- 爆炸基础伤害（主动 / 被动引爆）

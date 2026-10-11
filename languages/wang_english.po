@@ -123,12 +123,17 @@ msgstr "Learned %s"
 #. STRINGS.CHARACTER_DESCRIPTIONS.wang
 msgctxt "STRINGS.CHARACTER_DESCRIPTIONS.wang"
 msgid "A quiet chess player, trading his life for the board"
-msgstr "*A quiet chess player, trading his life for the board\n*Max health decreases as he grows, empowering his black stones\n*Cannot carry heavy objects alone, but can while riding a beefalo\n*Reads books well and masters recipes one by one"
+msgstr "*A quiet chess player, trading his life for the board\n*Max health decreases as he grows, empowering his black stones\n*Carries heavy objects briefly; rests to recover, with no limit on a beefalo\n*Reads books well and masters recipes one by one"
 
 #. STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING
 msgctxt "STRINGS.CHARACTERS.WANG.ACTIONFAIL.PICKUP.NO_HEAVY_LIFTING"
-msgid "Too heavy to carry alone... I'll need a beefalo."
-msgstr "Too heavy to carry alone... I'll need a beefalo."
+msgid "Let me catch my breath first..."
+msgstr "Let me catch my breath first..."
+
+#. STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_CARRY_EXHAUSTED
+msgctxt "STRINGS.CHARACTERS.WANG.ANNOUNCE.WANG_CARRY_EXHAUSTED"
+msgid "A moment's rest... then I'll carry on."
+msgstr "A moment's rest... then I'll carry on."
 
 #. STRINGS.ACTIONS.TEACH_RECIPE
 msgctxt "STRINGS.ACTIONS.TEACH_RECIPE"

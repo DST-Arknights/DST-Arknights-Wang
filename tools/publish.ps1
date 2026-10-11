@@ -11,20 +11,10 @@ $projectConfig = @{
     GitFiles = @(
         'modinfo.lua'
         'CHANGELOG.md'
-        'docs/workshop_description_zh.md'
-        'docs/workshop_description_en.md'
         'docs/workshop_description_zh-steam.txt'
         'docs/workshop_description_en-steam.txt'
     )
     LanguagesDir = 'languages'
-    SteamDescriptionMarkdown = @(
-        'docs/workshop_description_zh.md'
-        'docs/workshop_description_en.md'
-    )
-    SteamDescriptionOutput = @(
-        'docs/workshop_description_zh-steam.txt'
-        'docs/workshop_description_en-steam.txt'
-    )
     WorkshopDeps = @{
         'DST-Arknights-Nexus' = 'workshop-3677284770'
     }

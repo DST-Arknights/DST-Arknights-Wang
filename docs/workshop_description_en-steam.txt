@@ -17,7 +17,7 @@ The mod supports Simplified Chinese and English text. Voice-over can be set to M
 [*]Movement speed, weapon damage, and work efficiency are all [b]80%[/b] of a standard character's.
 [*]Hunger drains more slowly, but food restores only [b]50%[/b] of the usual hunger.
 [*]Immune to knockback and the Monkey Curse; can read books.
-[*]Cannot carry heavy objects alone, but can while riding a beefalo.
+[*]Can carry heavy objects on foot for up to [b]60 seconds[/b] at a time, recovering stamina after putting them down. Exhaustion forces him to drop the load and rest for at least [b]10 seconds[/b]; stamina refills from empty in [b]1 minute[/b]. Riding a beefalo removes this limit and lets stamina recover.
 [/list]
 
 [h2]Progression and Learning[/h2]

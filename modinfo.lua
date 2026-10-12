@@ -8,25 +8,27 @@ name = T({
     en = "Wang",
     zh = "望"
 })
-version = "1.1.1"
+version = "1.1.2"
 
 -- 版本更新说明（由发布脚本自动维护，请勿手动编辑）
 local UPDATE_EN = [[
+v1.1.2 (2026-10-12)
+- Added carrying stamina for Wang: at full stamina, walking can carry for 60 seconds, and stamina recovers gradually after dropping the load; when depleted, the load is dropped automatically and Wang is forced to rest for 10 seconds.
+- While riding a Beefalo, carrying does not consume stamina and stamina can recover; remaining stamina and rest time are saved with the character.
+- Updated Wang's Chinese and English character selection bio, carrying lines, and Steam copy.
+---
 v1.1.1 (2026-10-07)
 - Added a crafting recipe for Cloud Beast.
----
-v1.1.0 (2026-10-06)
-- In non-PvP mode, Chess Piece explosions and Linked Star Lightning no longer damage players; the shock animation and PvP damage behavior remain unchanged.
-- Updated the version number and added the current version info to the description.
 ]]
 
 local UPDATE_ZH = [[
+v1.1.2 (2026-10-12)
+- 为 Wang 新增搬运体力：步行满体力可搬运 60 秒，放下后逐渐恢复；体力耗尽时会自动放下并强制休息 10 秒。
+- 骑 Beefalo 时搬运不消耗体力且可恢复；剩余体力和休息时间会随角色存档保存。
+- 更新了 Wang 的中英文选角简介、搬运台词和 Steam 文案。
+---
 v1.1.1 (2026-10-07)
 - 新增 Cloud Beast 制作配方。
----
-v1.1.0 (2026-10-06)
-- 非 PvP 模式下，棋子爆炸与连星闪电不再伤害玩家，触电动作和 PvP 中的伤害行为保持不变。
-- 更新版本号，并在描述中显示当前版本信息。
 ]]
 
 description = T({

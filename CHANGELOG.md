@@ -1,5 +1,15 @@
 # 版本更新记录
 
+## v1.1.2 (2026-10-12)
+
+- 为 Wang 新增搬运体力：步行满体力可搬运 60 秒，放下后逐渐恢复；体力耗尽时会自动放下并强制休息 10 秒。
+- 骑 Beefalo 时搬运不消耗体力且可恢复；剩余体力和休息时间会随角色存档保存。
+- 更新了 Wang 的中英文选角简介、搬运台词和 Steam 文案。
+---
+- Added carrying stamina for Wang: at full stamina, walking can carry for 60 seconds, and stamina recovers gradually after dropping the load; when depleted, the load is dropped automatically and Wang is forced to rest for 10 seconds.
+- While riding a Beefalo, carrying does not consume stamina and stamina can recover; remaining stamina and rest time are saved with the character.
+- Updated Wang's Chinese and English character selection bio, carrying lines, and Steam copy.
+
 ## v1.1.1 (2026-10-07)
 
 - 新增 Cloud Beast 制作配方。

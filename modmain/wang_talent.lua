@@ -167,34 +167,21 @@ local function IsM3CocoonArmorMinHealth(health)
   return false
 end
 
-local function IsYingjieLethal(health, amount, ignore_invincible, ignore_absorb)
-  if amount >= 0 or ignore_absorb or health.currenthealth <= 0 then
-    return false
-  end
-  local lethalHealth = 0
-  if (health.minhealth or 0) > 0 then
-    if not IsM3CocoonArmorMinHealth(health) then
-      return false
-    end
-    -- 茧甲在触及最低生命值时就会牺牲，应劫必须先于这个下限判断，而非等到 0 血。
-    lethalHealth = math.min(health.minhealth, health:GetMaxWithPenalty())
-  end
-  if not ignore_invincible and (health:IsInvincible() or health.inst.is_teleporting) then
-    return false
-  end
-
-  local projected = amount
-  -- deltamodifierfn 已拿到实际减伤结果，之后只剩原版的单次伤害上限。
-  if health.maxdamagetakenperhit ~= nil
-      and projected < health.maxdamagetakenperhit
-      and not health._ignore_maxdamagetakenperhit then
-    projected = health.maxdamagetakenperhit
-  end
-  return projected < 0 and health.currenthealth + projected <= lethalHealth
+-- 原版 Kill/ForceKill 会临时设置该标记；强制击杀不受应劫保护。
+local function IsForceKill(health)
+  return health._ignore_maxdamagetakenperhit == true
 end
 
-local function KeepHealthDelta(_, amount)
-  return amount
+-- 返回本次 SetVal 的致死阈值；其他来源的锁血下限优先，返回 nil 表示不接管。
+local function GetYingjieLethalHealth(health)
+  if (health.minhealth or 0) <= 0 then
+    return 0
+  end
+  if not IsM3CocoonArmorMinHealth(health) then
+    return nil
+  end
+  -- 茧甲在触及最低生命值时就会牺牲，应劫必须先于这个下限判断，而非等到 0 血。
+  return math.min(health.minhealth, health:GetMaxWithPenalty())
 end
 
 local function OnYingjieInstall(talent)
@@ -204,41 +191,42 @@ local function OnYingjieInstall(talent)
     return
   end
 
-  -- 数值回调必须先补齐链尾，解锁 Hook 及锁定后的空链才能原样返回生命变化量。
-  if health.deltamodifierfn == nil then
-    health.deltamodifierfn = KeepHealthDelta
-  end
-
-  -- 先按当前落子数刷新减伤；已有保护在生命结算前直接挡掉。
+  -- 先按当前落子数刷新减伤；保护窗口内除强制击杀外的扣血都在生命结算前挡掉。
   talent:HookFunctionWhileUnlocked(health, "redirect", function(next, player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
     if next(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb) then
       return true
     end
-    if amount >= 0 or ignore_absorb then
+    if amount >= 0 then
       return false
     end
 
     RefreshYingjieDamageReduction(talent)
 
-    if talent._yingjie_guard_task ~= nil then
+    if talent._yingjie_guard_task ~= nil and not IsForceKill(health) then
       PlayYingjieShieldHit(talent)
       return true
     end
     return false
   end)
 
-  -- 首次保护使用护甲和生命减伤结算后的实际伤害，先于 minhealth 的装备复活。
-  talent:HookFunctionWhileUnlocked(health, "deltamodifierfn", function(next, player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
-    amount = next(player, amount, overtime, cause, ignore_invincible, afflicter, ignore_absorb)
-    local params = talent:GetLevelParams()
-    if not params.lethalProtection
-        or not IsYingjieLethal(health, amount, ignore_invincible, ignore_absorb)
-        or not TryConsumeYingjieResource(talent, params) then
-      return amount
+  -- 所有扣血最终都经过 SetVal：致死时以黑子代替生命，兼容其他模组无视减伤的扣血。
+  talent:HookFunctionWhileUnlocked(health, "SetVal", function(next, self, val, cause, afflicter)
+    local old_health = self.currenthealth
+    if val < old_health and old_health > 0 and cause ~= "file_load" and not IsForceKill(self) then
+      local lethalHealth = GetYingjieLethalHealth(self)
+      if lethalHealth ~= nil and val <= lethalHealth then
+        if talent._yingjie_guard_task ~= nil then
+          PlayYingjieShieldHit(talent)
+          return
+        end
+        local params = talent:GetLevelParams()
+        if params.lethalProtection and TryConsumeYingjieResource(talent, params) then
+          StartYingjieGuard(talent, params.guardDuration or 0)
+          return
+        end
+      end
     end
-
-    StartYingjieGuard(talent, params.guardDuration or 0)
-    return 0
+    return next(self, val, cause, afflicter)
   end)
 
   -- 保护窗口内的普通战斗攻击在护甲结算前直接挡掉；解锁/锁定/读档生命周期交给框架。

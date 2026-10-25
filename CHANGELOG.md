@@ -1,5 +1,11 @@
 # 版本更新记录
 
+## v1.1.3 (2026-10-26)
+
+- 修复 Yingjie 致命保护：Prism 等模组的无视减伤扣血现在也会触发保护，低血量 Wang 不再被直接击杀；致死扣血会消耗 Black Piece，仅放过 Kill/ForceKill，并保留 M3 Cocoon Armor 锁血下限的提前保护。
+---
+- Fixed Yingjie fatal protection so ignore-reduction HP loss from mods like Prism now triggers it, preventing low-health Wang from being instantly killed; lethal HP loss consumes Black Piece except for Kill/ForceKill, while M3 Cocoon Armor's early low-HP lock protection still applies.
+
 ## v1.1.2 (2026-10-12)
 
 - 为 Wang 新增搬运体力：步行满体力可搬运 60 秒，放下后逐渐恢复；体力耗尽时会自动放下并强制休息 10 秒。

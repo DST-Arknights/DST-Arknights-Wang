@@ -8,27 +8,27 @@ name = T({
     en = "Wang",
     zh = "望"
 })
-version = "1.1.2"
+version = "1.1.3"
 
 -- 版本更新说明（由发布脚本自动维护，请勿手动编辑）
 local UPDATE_EN = [[
+v1.1.3 (2026-10-26)
+- Fixed Yingjie fatal protection so ignore-reduction HP loss from mods like Prism now triggers it, preventing low-health Wang from being instantly killed; lethal HP loss consumes Black Piece except for Kill/ForceKill, while M3 Cocoon Armor's early low-HP lock protection still applies.
+---
 v1.1.2 (2026-10-12)
 - Added carrying stamina for Wang: at full stamina, walking can carry for 60 seconds, and stamina recovers gradually after dropping the load; when depleted, the load is dropped automatically and Wang is forced to rest for 10 seconds.
 - While riding a Beefalo, carrying does not consume stamina and stamina can recover; remaining stamina and rest time are saved with the character.
 - Updated Wang's Chinese and English character selection bio, carrying lines, and Steam copy.
----
-v1.1.1 (2026-10-07)
-- Added a crafting recipe for Cloud Beast.
 ]]
 
 local UPDATE_ZH = [[
+v1.1.3 (2026-10-26)
+- 修复 Yingjie 致命保护：Prism 等模组的无视减伤扣血现在也会触发保护，低血量 Wang 不再被直接击杀；致死扣血会消耗 Black Piece，仅放过 Kill/ForceKill，并保留 M3 Cocoon Armor 锁血下限的提前保护。
+---
 v1.1.2 (2026-10-12)
 - 为 Wang 新增搬运体力：步行满体力可搬运 60 秒，放下后逐渐恢复；体力耗尽时会自动放下并强制休息 10 秒。
 - 骑 Beefalo 时搬运不消耗体力且可恢复；剩余体力和休息时间会随角色存档保存。
 - 更新了 Wang 的中英文选角简介、搬运台词和 Steam 文案。
----
-v1.1.1 (2026-10-07)
-- 新增 Cloud Beast 制作配方。
 ]]
 
 description = T({

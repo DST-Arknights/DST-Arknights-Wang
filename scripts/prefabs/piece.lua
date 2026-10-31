@@ -42,7 +42,10 @@ local PROX_CHECK_INTERVAL = 1 -- 部署态检测周期（秒）
 -- 触发：怪物 / 动物 / 敌对角色；"player" 加入禁止表 → 玩家（含望自己）不会触发陷阱
 local PROX_ONEOF_TAGS = { "monster", "character", "animal" }
 local PROX_MUST_TAGS = { "_combat" }
-local PROX_NO_TAGS = { "notraptrigger", "flying", "ghost", "playerghost", "spawnprotection", "player" }
+-- 注意：不能照抄 mine 组件的 "flying" 排除。龙蝇常驻 "flying"（dragonfly.lua 与
+-- ignorewalkableplatformdrowning 一起添加），整表排除会让巨型 boss 永远踩不到陷阱。
+-- 这里只把真正的小型飞空单位排除在外，见 IsProximityTarget。
+local PROX_NO_TAGS = { "notraptrigger", "ghost", "playerghost", "spawnprotection", "player" }
 
 RegisterInventoryItemAtlas("images/inventoryimages/piece.xml", "piece.tex")
 
@@ -156,10 +159,21 @@ end
 -- 参考蜜蜂地雷 mine 组件（DoPeriodicTask + FindEntity）
 -- 触发：怪物/动物/敌对角色（玩家不触发）；爆炸伤害由 AoEExplode 统一筛选，不摧毁建造物
 -- ────────────────────────────────────────────────────────
+
+-- 飞空单位默认不触发陷阱（小鸟 / 蜜蜂 / 蝴蝶路过不该白白炸掉一枚棋子）；
+-- 但龙蝇、蜂后这类带 "flying" 的巨型 boss 仍按地面敌人处理，否则永远无法引爆黑子。
+local function IsProximityTarget(inst, dude)
+  if dude:HasTag("flying")
+      and not (dude:HasTag("largecreature") or dude:HasTag("epic")) then
+    return false
+  end
+  return not (dude.components.health ~= nil and dude.components.health:IsDead())
+    and dude.components.combat ~= nil and dude.components.combat:CanBeAttacked(inst)
+end
+
 local function PassiveDetonateCheck(inst)
   local target = FindEntity(inst, EXPLODE_RANGE * inst._explodeRangeMultiplier, function(dude)
-    return not (dude.components.health ~= nil and dude.components.health:IsDead())
-      and dude.components.combat ~= nil and dude.components.combat:CanBeAttacked(inst)
+    return IsProximityTarget(inst, dude)
   end, PROX_MUST_TAGS, PROX_NO_TAGS, PROX_ONEOF_TAGS)
   if target ~= nil then
     inst:PassiveExplode(nil, 1) -- 被动引爆：范围伤害、不摧毁建造物，保留棋子伤害来源

@@ -1,5 +1,11 @@
 # 版本更新记录
 
+## v1.1.4 (2026-11-01)
+
+- 部署的 Heizi 现在会被 Dragonfly 等巨型飞空 boss 引爆，小型飞空生物仍不会触发。
+---
+- Deployed Heizi can now be detonated by giant flying bosses such as Dragonfly, while small flying creatures still won't trigger it.
+
 ## v1.1.3 (2026-10-26)
 
 - 修复 Yingjie 致命保护：Prism 等模组的无视减伤扣血现在也会触发保护，低血量 Wang 不再被直接击杀；致死扣血会消耗 Black Piece，仅放过 Kill/ForceKill，并保留 M3 Cocoon Armor 锁血下限的提前保护。
